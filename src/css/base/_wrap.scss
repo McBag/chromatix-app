@@ -1,0 +1,232 @@
+@use '../_config/vars';
+@use '../_config/mixins';
+
+// ======================================================================
+// WRAPPER
+// ======================================================================
+
+.wrap {
+  display: grid;
+  height: 100vh;
+  height: 100svh;
+
+  &--home {
+    background-image: url(/images/compressed/bg3.jpg);
+    background-image: url(/images/webp/bg3.webp);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    &:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(vars.$color-primary-bg, 0.15) 20%,
+        rgba(vars.$color-primary-bg, 0) 90%
+      );
+    }
+
+    &:after {
+      content: '';
+      position: absolute;
+      top: 75%;
+      left: 0;
+      width: 100%;
+      height: 25%;
+      background: linear-gradient(rgba(vars.$color-primary-bg, 0), rgba(vars.$color-primary-bg, 1));
+    }
+  }
+}
+
+.layout {
+  // Keep controls row height fixed so content area does not jump with track metadata.
+  --control-bar-height: 120px;
+
+  display: grid;
+  grid-template-areas:
+    'sidebar content rightbar'
+    'controls controls controls';
+  grid-template-rows: 1fr var(--control-bar-height);
+  grid-template-columns: auto 1fr auto;
+  height: 100vh;
+  height: 100svh;
+}
+
+.layout-sidebar {
+  overflow: auto;
+  grid-area: sidebar;
+  width: 180px;
+  background: var(--color-primary-bg);
+
+  @media (min-width: 880px) {
+    width: 190px;
+  }
+  @media (min-width: 960px) {
+    width: 200px;
+  }
+  @media (min-width: 1024px) {
+    width: 210px;
+  }
+  @media (min-width: 1140px) {
+    width: 220px;
+  }
+
+  html[data-electron-platform='lin'] &,
+  html[data-electron-platform='win'] & {
+    width: 207px;
+
+    @media (min-width: 1024px) {
+      width: 227px;
+    }
+  }
+}
+
+.layout-content {
+  overflow: auto;
+  grid-area: content;
+  background: var(--color-primary-bg);
+  // container-type: inline-size;
+}
+
+.layout-controls {
+  grid-area: controls;
+  height: var(--control-bar-height);
+  min-height: var(--control-bar-height);
+  max-height: var(--control-bar-height);
+  overflow: hidden;
+  background: var(--color-secondary-bg);
+}
+
+.layout-rightbar {
+  overflow: auto;
+  grid-area: rightbar;
+  width: 240px;
+  background: var(--color-secondary-bg);
+
+  @media (min-width: 880px) {
+    width: 260px;
+  }
+  @media (min-width: 960px) {
+    width: 280px;
+  }
+  @media (min-width: 1024px) {
+    width: 300px;
+  }
+  @media (min-width: 1140px) {
+    width: 320px;
+  }
+
+  html[data-electron-platform='lin'] &,
+  html[data-electron-platform='win'] & {
+    &:after {
+      content: '';
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 279px;
+      height: 30px;
+      background: var(--color-secondary-bg);
+
+      @media (min-width: 1024px) {
+        width: 319px;
+      }
+    }
+  }
+}
+
+.loading {
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+
+  background: var(--color-primary-bg);
+  background-image: url(../../images/loading-white.png);
+  background-size: 30px auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.wrap-middle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 25px 0;
+  padding-bottom: calc(25px + 3vh);
+
+  > div {
+    width: 100%;
+  }
+}
+
+.filterIconWrap {
+  flex-wrap: wrap;
+  line-height: 1;
+}
+
+.settingsGroup {
+  max-width: 800px;
+  padding-bottom: 40px;
+  font-size: 14px;
+  line-height: 20px;
+  text-wrap: balance;
+
+  @include mixins.content-padding-regular;
+
+  &NoPadding {
+    padding: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  &:last-child {
+    padding-bottom: 50px;
+  }
+
+  // > .settingsGroup {
+  //   padding-inline: 0;
+
+  //   &:last-child {
+  //     padding-bottom: 0;
+  //   }
+  // }
+}
+
+// .settingsGroupFlex {
+//   display: flex;
+//   flex-wrap: wrap;
+//   justify-content: space-between;
+//   row-gap: 40px;
+//   column-gap: 30px;
+//   max-width: 900px;
+//   // padding-bottom: 0 !important;
+
+//   > .settingsGroup {
+//     padding: 20px;
+//     padding-bottom: 20px !important;
+//     background: var(--color-opacity-005);
+//     border-radius: 6px;
+//   }
+// }
+
+.devButtons {
+  display: flex;
+  // flex-wrap: wrap;
+  gap: 12px;
+
+  > * {
+    flex: 1 0 auto;
+  }
+
+  & + .devButtons {
+    margin-top: 24px;
+  }
+}

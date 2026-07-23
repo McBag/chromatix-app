@@ -1,0 +1,442 @@
+@use 'sass:color';
+@use 'sass:map';
+@use 'vars';
+
+// ======================================================================
+// GENERAL
+// ======================================================================
+
+@mixin hidefont() {
+  font-size: 0;
+  line-height: 0;
+  text-indent: -9999px;
+}
+
+@mixin touchscroll() {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+@mixin noselect() {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+@mixin allowselect() {
+  -webkit-touch-callout: default;
+  -webkit-user-select: auto;
+  -khtml-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
+  user-select: auto;
+}
+
+@mixin hide-input() {
+  position: absolute;
+  top: 0;
+  left: -9999px;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+// @mixin focus-base() {
+//   @media (hover: hover) {
+//     outline: 2px solid var(--color-text);
+//     outline-offset: 2px;
+//   }
+// }
+
+@mixin artwork-border($radius) {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--color-opacity-01);
+  border-radius: $radius;
+  pointer-events: none;
+}
+
+@mixin content-padding-regular {
+  padding-left: 20px;
+  padding-right: 20px;
+
+  .cq-540 & {
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+  :global(.cq-540) & {
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+  .cq-800 & {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+  :global(.cq-800) & {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  // EXTREME EXAMPLE FOR TESTING
+  // .cq-1220 & {
+  //   padding-left: 100px;
+  //   padding-right: 100px;
+  // }
+  // :global(.cq-1220) & {
+  //   padding-left: 100px;
+  //   padding-right: 100px;
+  // }
+}
+
+@mixin content-padding-inset {
+  padding-left: 10px;
+  padding-right: 10px;
+
+  .cq-540 & {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  :global(.cq-540) & {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .cq-800 & {
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+  :global(.cq-800) & {
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+
+  // EXTREME EXAMPLE FOR TESTING
+  // .cq-1220 & {
+  //   padding-left: 90px;
+  //   padding-right: 90px;
+  // }
+  // :global(.cq-1220) & {
+  //   padding-left: 90px;
+  //   padding-right: 90px;
+  // }
+}
+
+@mixin focus-self-outline() {
+  &:focus-visible:not(:active):not(:disabled) {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        outline: 2px solid var(--color-text);
+        outline-offset: 2px;
+      }
+    }
+  }
+}
+
+@mixin focus-self-fill() {
+  &:focus-visible:not(:active):not(:disabled) {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        background: var(--color-opacity-01);
+      }
+    }
+  }
+}
+
+@mixin focus-self-underline() {
+  &:focus-visible:not(:active):not(:disabled) {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        text-decoration: underline;
+        color: var(--color-text) !important;
+      }
+    }
+  }
+}
+
+@mixin focus-self-custom() {
+  &:focus-visible:not(:active):not(:disabled) {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        @content;
+      }
+    }
+  }
+}
+
+// @mixin focus-row-outline() {
+//   a:focus-visible:not(:active):not(:disabled) &,
+//   button:focus-visible:not(:active):not(:disabled) & {
+//     :global(html[data-access-focus='true']) & {
+//       @media (hover: hover) {
+//         outline: 2px solid var(--color-text);
+//         outline-offset: -2px;
+//       }
+//     }
+//   }
+// }
+
+@mixin focus-parent-outline() {
+  &:has(*:focus-visible:not(:active):not(:disabled)) {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        outline: 2px solid var(--color-text);
+        outline-offset: 2px;
+      }
+    }
+  }
+}
+
+// @mixin focus-parent-custom() {
+//   &:has(*:focus-visible:not(:active):not(:disabled)) {
+//     :global(html[data-access-focus='true']) & {
+//       @media (hover: hover) {
+//         @content;
+//       }
+//     }
+//   }
+// }
+
+// @mixin focus-sibling-outline() {
+//   input:focus-visible:not(:active):not(:disabled) ~ & {
+//     :global(html[data-access-focus='true']) & {
+//       @media (hover: hover) {
+//         outline: 2px solid var(--color-text);
+//         outline-offset: 2px;
+//       }
+//     }
+//   }
+// }
+
+@mixin focus-child-outline() {
+  a:focus-visible:not(:active):not(:disabled) &,
+  button:focus-visible:not(:active):not(:disabled) & {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        outline: 2px solid var(--color-text);
+        outline-offset: 2px;
+      }
+    }
+  }
+}
+
+@mixin focus-child-custom() {
+  *:focus-visible:not(:active):not(:disabled) & {
+    :global(html[data-access-focus='true']) & {
+      @media (hover: hover) {
+        @content;
+      }
+    }
+  }
+}
+
+// @mixin focus-within-outline() {
+//   &:focus-within:focus-visible {
+//     :global(html[data-access-focus='true']) & {
+//       @media (hover: hover) {
+//         outline: 2px solid var(--color-text);
+//         outline-offset: 2px;
+//       }
+//     }
+//   }
+// }
+
+@mixin electron-drag() {
+  -webkit-app-region: drag;
+  // background: #f00 !important;
+
+  a,
+  button,
+  input {
+    -webkit-app-region: no-drag;
+  }
+}
+@mixin electron-no-drag() {
+  -webkit-app-region: no-drag;
+}
+
+@mixin dark-theme() {
+  html[data-theme='system'] & {
+    @media (prefers-color-scheme: dark) {
+      @content;
+    }
+  }
+  :global(html.sb-dark-mode) &,
+  html[data-theme='dark'] & {
+    @content;
+  }
+}
+
+@mixin light-theme() {
+  html[data-theme='system'] & {
+    @media (prefers-color-scheme: light) {
+      @content;
+    }
+  }
+  :global(html.sb-light-mode) &,
+  html[data-theme='light'] & {
+    @content;
+  }
+}
+
+@function color-add($color1, $color2) {
+  // @return $color1 + $color2;
+
+  // because for some reason "$color1 + $color2" is being deprecated
+  @return color.adjust($color1, $red: color.red($color2), $green: color.green($color2), $blue: color.blue($color2));
+}
+
+@function color-subtract($color1, $color2) {
+  // @return $color1 + $color2;
+
+  // because for some reason "$color1 + $color2" is being deprecated
+  @return color.adjust(
+    $color1,
+    $red: 0 - color.red($color2),
+    $green: 0 - color.green($color2),
+    $blue: 0 - color.blue($color2)
+  );
+}
+
+// ======================================================================
+// ARRAY MAP
+// ======================================================================
+
+// Create module-level variables to store state
+$_map-array: null !default;
+$_map-key: null !default;
+$_map-val: null !default;
+
+@function map-key() {
+  @return $_map-key;
+}
+
+@function map-val($key: null) {
+  @if $key != null {
+    @return map.get(map.get($_map-array, $_map-key), $key);
+  } @else {
+    @return map.get($_map-array, $_map-key);
+  }
+}
+
+@function list-val() {
+  @return $_map-val;
+}
+
+@mixin breakpoint-map($array) {
+  $_map-array: $array !global;
+  @each $key, $val in $array {
+    $_map-key: $key !global;
+    @if $key == 0 {
+      @content;
+    } @else {
+      @media (min-width: map.get(vars.$breakpoints,$key)) {
+        @content;
+      }
+    }
+  }
+}
+
+@mixin breakpoint-map-filtered($array, $zero: true) {
+  $_map-array: vars.$breakpoints !global;
+  @if $zero == true {
+    $_map-key: 0 !global;
+    @content;
+  }
+  @each $key in $array {
+    $_map-key: $key !global;
+    $breakpoint: map.get(vars.$breakpoints, $key);
+    @media (min-width: $breakpoint) {
+      @content;
+    }
+  }
+}
+
+@mixin array-map($array) {
+  $_map-array: $array !global;
+  @each $key, $val in $array {
+    $_map-key: $key !global;
+    @content;
+  }
+}
+
+@mixin list-map($list) {
+  @each $val in $list {
+    $_map-val: $val !global;
+    @content;
+  }
+}
+
+// get the largest value from a breakpoint map
+@function map-largest-val($array) {
+  $bp-key: 0;
+  @each $key, $val in vars.$breakpoints {
+    @if (map.has-key($array, $key)) {
+      $bp-key: $key;
+    }
+  }
+  @return map.get($array, $bp-key);
+}
+
+// get the closest value from a breakpoint map (<=)
+@function map-closest-val($array, $key) {
+  @if (map.has-key($array, $key)) {
+    @return map.get($array, $key);
+  } @else {
+    $bp-key: 0;
+    @each $key2, $val in vars.$breakpoints {
+      @if ($key2 == $key) {
+        @return map.get($array, $bp-key);
+      }
+      @if (map.has-key($array, $key2)) {
+        $bp-key: $key2;
+      }
+    }
+    // Ensure we always return something
+    @return map.get($array, $bp-key);
+  }
+}
+
+// breakpoint map can be used to map values to breakpoints as follows:
+// .element {
+//   @include breakpoint-map(
+//     (
+//       0: 16px,
+//       md: 18px,
+//       lg: 20px
+//     )
+//   ) {
+//     font-size: map-val();
+//   }
+// }
+
+// array map can be used as follows:
+// @include array-map(
+//   (
+//     red: #f00,
+//     green: #0f0,
+//     blue: #00f
+//   )
+// ) {
+//   .element--#{map-key()} {
+//     background: #{map-val()};
+//   }
+// }
+
+// ======================================================================
+// IMAGE POSITION
+// ======================================================================
+
+// @mixin imgpos($parent_w, $parent_h, $w, $h, $left, $top) {
+//   width: percentage($w/$parent_w);
+//   height: percentage($h/$parent_h);
+//   left: percentage($left/$parent_w);
+//   top: percentage($top/$parent_h);
+// }
+
+@function max-width-breakpoint() {
+  @return vars.$grid-max-width + map.get(map-largest-val(vars.$wrapper-paddings), x) +
+    map.get(map-largest-val(vars.$wrapper-paddings), x) + vars.$sidebar-width-xl;
+}

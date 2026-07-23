@@ -1,0 +1,153 @@
+import { useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import platformFeatures from 'js/_config/platformFeatures';
+import { durationToStringLong, formatReleaseYear, sortList } from 'js/utils';
+import * as bridge from 'js/services/bridge';
+
+const useGetAlbumDetail = ({ libraryId, albumId }) => {
+  const dispatch = useDispatch();
+
+  const currentService = useSelector(({ appModel }) => appModel.currentService);
+  const platformOpts = platformFeatures[currentService] || {};
+
+  const sortAlbumTracks = useSelector(({ sessionModel }) => sessionModel.sortAlbumTracks);
+  const albumSortString = sortAlbumTracks[albumId] || null;
+
+  const colAlbumArtist = useSelector(({ sessionModel }) => sessionModel.colAlbumArtist);
+  const colAlbumCodec = useSelector(({ sessionModel }) => sessionModel.colAlbumCodec);
+  const colAlbumBitrate = useSelector(({ sessionModel }) => sessionModel.colAlbumBitrate);
+  const colAlbumDuration = useSelector(({ sessionModel }) => sessionModel.colAlbumDuration);
+  const colAlbumUserRating = useSelector(({ sessionModel }) => sessionModel.colAlbumUserRating);
+  const colAlbumIsFavourite = useSelector(({ sessionModel }) => sessionModel.colAlbumIsFavourite);
+
+  const optionSortNumbersFirst = useSelector(({ sessionModel }) => sessionModel.optionSortNumbersFirst);
+  const optionSortIgnoreLeadingArticles = useSelector(
+    ({ sessionModel }) => sessionModel.optionSortIgnoreLeadingArticles
+  );
+
+  // prevent sorting by a hidden field
+  const allowedSort = {
+    sortOrder: true,
+    title: true,
+    artist: colAlbumArtist,
+    codec: colAlbumCodec,
+    bitrate: colAlbumBitrate,
+    duration: colAlbumDuration,
+    userRating: platformOpts.enableUserRating && colAlbumUserRating,
+    isFavourite: platformOpts.enableIsFavourite && colAlbumIsFavourite,
+  };
+  const actualAlbumSortString = allowedSort[albumSortString?.split('-')[0]] ? albumSortString : null;
+
+  const allAlbums = useSelector(({ appModel }) => appModel.allAlbums);
+  const albumInfo = allAlbums?.find((album) => album.albumId === albumId);
+
+  const allAlbumTracks = useSelector(({ appModel }) => appModel.allAlbumTracks);
+  const albumTracks = allAlbumTracks[libraryId + '-' + albumId];
+
+  const albumThumb = albumInfo?.thumbSm;
+  const albumThumbMedium = albumInfo?.thumbMd;
+  const albumTitle = albumInfo?.title;
+  const albumArtist = albumInfo?.artist;
+  const albumReleaseDate = formatReleaseYear(albumInfo?.releaseDate);
+  const albumDiscCount = useMemo(() => {
+    return (
+      albumTracks?.reduce((acc, entry) => {
+        return Math.max(acc, entry.discNumber);
+      }, 0) || 1
+    );
+  }, [albumTracks]);
+  const albumTrackCount = albumTracks?.length;
+  const albumDurationMillisecs = albumTracks?.reduce((acc, track) => acc + track.duration, 0);
+  const albumDurationString = durationToStringLong(albumDurationMillisecs);
+  const albumRating = albumInfo?.userRating;
+  const albumIsFavourite = albumInfo?.isFavourite;
+  const albumArtistLink = albumInfo?.artistLink;
+
+  const sortedAlbumTracks = useMemo(() => {
+    if (!albumTracks) return null;
+    if (actualAlbumSortString) {
+      // Add originalIndex to each entry
+      const entriesWithOriginalIndex = albumTracks.map((entry, index) => ({
+        ...entry,
+        originalIndex: index,
+      }));
+      // Sort entries
+      if (actualAlbumSortString === 'sortOrder-desc') {
+        return entriesWithOriginalIndex.slice().reverse();
+      } else {
+        return sortList({
+          entries: entriesWithOriginalIndex,
+          options: actualAlbumSortString,
+          sortNumbersFirst: optionSortNumbersFirst,
+          ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
+        });
+      }
+    }
+    // If not an album or no actualAlbumSortString, return original entries
+    return albumTracks.map((entry, index) => ({
+      ...entry,
+      originalIndex: index,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allAlbumTracks, albumTracks, actualAlbumSortString]);
+
+  const albumOrder = useMemo(() => {
+    return sortedAlbumTracks?.map((entry) => entry.originalIndex);
+  }, [sortedAlbumTracks]);
+
+  const setColumnVisibility = (columnKey, columnValue) => {
+    dispatch.sessionModel.setSessionState({
+      [columnKey]: columnValue,
+    });
+  };
+
+  // Get the required album data
+  useEffect(() => {
+    // bridge.getAllAlbums();
+    // if (!albumInfo) {
+    bridge.getAlbumDetails(libraryId, albumId);
+    // }
+    bridge.getAlbumTracks(libraryId, albumId).catch(() => {});
+  }, [albumId, libraryId]);
+
+  // // Fallback in case album data is not included in the allAlbums array
+  // useEffect(() => {
+  //   console.log(allAlbums);
+  //   if (allAlbums && !albumInfo) {
+  //     bridge.getAlbumDetails(libraryId, albumId);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [allAlbums, albumInfo]);
+
+  return {
+    albumInfo,
+
+    albumThumb,
+    albumThumbMedium,
+    albumTitle,
+    albumArtist,
+    albumReleaseDate,
+    albumDiscCount,
+    albumTrackCount,
+    albumDurationString,
+    albumRating,
+    albumIsFavourite,
+    albumArtistLink,
+
+    albumTracks: sortedAlbumTracks,
+    albumOrder,
+    albumSortString: actualAlbumSortString,
+
+    colOptions: {
+      artist: colAlbumArtist,
+      codec: colAlbumCodec,
+      bitrate: colAlbumBitrate,
+      duration: colAlbumDuration,
+      userRating: platformOpts.enableUserRating && colAlbumUserRating,
+      isFavourite: platformOpts.enableIsFavourite && colAlbumIsFavourite,
+    },
+    setColumnVisibility,
+  };
+};
+
+export default useGetAlbumDetail;

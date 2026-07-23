@@ -1,0 +1,66 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.title {
+  margin: 0 0 15px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--color-opacity-05);
+}
+
+.colorWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.colorField {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-right: 30px;
+
+  &:last-child {
+    margin-top: 4px;
+  }
+
+  button {
+    display: inline-block;
+    width: auto !important;
+    min-width: 90px !important;
+  }
+}
+
+.colorLabel {
+  display: inline-block;
+  min-width: 120px;
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.colorInput {
+  width: 54px;
+  height: 30px;
+  padding: 0;
+  margin: 0;
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  border-radius: 6px;
+
+  @include mixins.focus-self-outline;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 3px;
+    border: none;
+  }
+
+  &::-webkit-color-swatch {
+    border: 1px solid var(--color-secondary-border);
+    border-radius: 3px;
+  }
+
+  &::-moz-color-swatch {
+    border: 1px solid var(--color-secondary-border);
+    border-radius: 3px;
+  }
+}

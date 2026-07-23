@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    // Build
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "target": "ES2020",
+
+    // Interop
+    "allowJs": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+
+    // Type safety
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "strict": true,
+
+    // Type sources
+    "types": ["vitest/globals", "vite/client"],
+
+    // Path aliases
+    "paths": {
+      "js/*": ["./src/js/*"],
+      "types/*": ["./src/types/*"]
+    }
+
+    // Worth considering
+    // "noUncheckedIndexedAccess": true,   // array/index access returns T | undefined — catches real bugs but requires fixes
+    // "noImplicitReturns": true           // all code paths must explicitly return
+  },
+  "include": ["src", "vite.config.ts", "vitest.setup.ts", "playwright.config.ts", "tests"],
+  "exclude": ["**/_archived/**"]
+}

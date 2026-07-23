@@ -1,0 +1,28 @@
+@use '../_config/mixins';
+
+.electron-drag {
+  display: none;
+
+  html[data-is-electron='true'] & {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 20px;
+    height: 32px;
+
+    // background: rgba(255, 0, 0, 0.2);
+    // z-index: 999999;
+
+    @include mixins.electron-drag;
+  }
+
+  html[data-electron-platform='mac'] & {
+    left: 80px;
+  }
+
+  html[data-electron-platform='lin'] &,
+  html[data-electron-platform='win'] & {
+    right: 140px;
+  }
+}

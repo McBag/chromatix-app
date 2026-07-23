@@ -1,0 +1,321 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.wrap {
+  z-index: 2;
+  padding: 80px 15px 50px;
+  text-align: center;
+
+  @media (min-width: 768px) {
+    padding: 100px 15px 50px;
+  }
+  @media (min-width: 1024px) {
+    padding: 140px 20px 90px;
+
+    @media (max-height: 900px) {
+      padding-top: 120px;
+    }
+    @media (max-height: 800px) {
+      padding-top: 100px;
+    }
+  }
+}
+
+//
+// INTRO
+//
+
+.intro {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 140px;
+  padding: 6px 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 99px;
+
+  font-size: 13px;
+  line-height: 1;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+
+  @media (min-width: 1024px) {
+    min-width: 180px;
+    padding: 8px 20px;
+    font-size: 14px;
+  }
+}
+
+.h1 {
+  font-size: 48px;
+  line-height: 1;
+  font-weight: bold;
+
+  @media (min-width: 390px) {
+    font-size: 56px;
+  }
+  @media (min-width: 1024px) {
+    font-size: 60px;
+  }
+}
+
+.h2 {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: bold;
+
+  // @media (min-width: 390px) {
+  //   font-size: 30px;
+  // }
+  // @media (min-width: 1024px) {
+  //   font-size: 30px;
+  // }
+}
+
+.hr {
+  width: 150px;
+  height: 2px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.body {
+  max-width: 90%;
+  margin: 0 auto;
+  font-size: 17px;
+  text-wrap: balance;
+
+  @media (min-width: 1024px) {
+    max-width: none;
+    font-size: 19px;
+  }
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+
+  > * {
+    flex: 1 1 auto;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  @media (min-width: 600px) {
+    flex-direction: row;
+  }
+}
+
+//
+// IMAGE
+//
+
+.image {
+  overflow: hidden;
+  width: 100%;
+  max-width: 460px;
+  border: 1px solid vars.$color-secondary-border;
+  border-radius: 6px;
+  box-shadow: 0px 5px 20px rgba(0, 0, 0, 0.25);
+
+  @media (min-width: 768px) {
+    width: 80vw;
+    max-width: none;
+    border-radius: 8px;
+  }
+  @media (min-width: 1024px) {
+    max-width: 1200px;
+    border-radius: 12px;
+  }
+}
+
+.margin {
+  margin: 100px auto;
+
+  @media (min-width: 768px) {
+    margin: 115px auto;
+  }
+  @media (min-width: 1024px) {
+    margin: 135px auto;
+
+    @media (max-height: 900px) {
+      margin: 120px auto;
+    }
+    @media (max-height: 800px) {
+      margin: 110px auto;
+    }
+  }
+}
+
+//
+// DOWNLOADS
+//
+
+.downloadsFlex {
+  display: flex;
+  justify-content: center;
+
+  > div {
+    text-align: left;
+  }
+}
+
+.downloadsDivider {
+  height: 15px;
+}
+
+.downloadsLink,
+.downloadsNote {
+  display: inline-block;
+  padding: 5px;
+  border-radius: 4px;
+  color: vars.$color-core;
+}
+
+.downloadsLink {
+  &:hover {
+    text-decoration: underline;
+  }
+
+  @include mixins.focus-self-outline;
+}
+
+.downloadsNote {
+  color: var(--color-opacity-05);
+}
+
+.downloadsIcon {
+  display: inline-block;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+}
+
+//
+// SOCIAL
+//
+
+.social {
+}
+
+.icons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.icon {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+
+  @include mixins.focus-self-outline;
+}
+
+//
+// SUPPORT
+//
+
+.support {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  max-width: 300px;
+  margin: 50px auto 0;
+
+  @media (min-width: 768px) {
+    max-width: none;
+  }
+}
+
+.github,
+.kofi {
+  display: block;
+  flex: 0 0 auto;
+  width: 220px;
+  height: 38px;
+  background: #fff;
+  background-image: url(../../../images/support-github.png);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 6px;
+
+  font-size: 0;
+  line-height: 0;
+  text-indent: -9999px;
+
+  @media (min-width: 768px) {
+    width: 240px;
+    height: 42px;
+  }
+
+  // @media (min-width: 1280px) {
+  //   width: 260px;
+  //   height: 45px;
+  // }
+
+  @include mixins.focus-self-outline;
+}
+
+.kofi {
+  background-color: #0067fc;
+  background-image: url(../../../images/support-kofi.png);
+}
+
+//
+// FOOTER
+//
+
+.border,
+.borderSmall {
+  max-width: 1280px;
+  height: 1px;
+  margin: 100px auto 50px;
+  background: rgba(255, 255, 255, 0.15);
+
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 20%,
+    rgba(255, 255, 255, 0.15) 80%,
+    rgba(255, 255, 255, 0) 100%
+  );
+
+  @media (min-width: 768px) {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.15) 40%,
+      rgba(255, 255, 255, 0.15) 60%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  @media (min-width: 1024px) {
+    margin: 120px auto 90px;
+  }
+}
+
+.borderSmall {
+  max-width: 200px;
+  margin: 20px auto;
+}
+
+.legal {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+}

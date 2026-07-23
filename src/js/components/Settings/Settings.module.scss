@@ -1,0 +1,142 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.wrap {
+  padding-bottom: 50px;
+
+  @include mixins.content-padding-regular;
+}
+
+.group {
+  font-size: 15px;
+
+  + .group {
+    margin-top: 45px;
+  }
+}
+
+.title {
+  margin: 0 0 15px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: bold;
+  color: var(--color-opacity-05);
+}
+
+.body {
+  margin: -10px 0 15px;
+  font-size: 14px;
+  color: var(--color-opacity-05);
+}
+
+.entry {
+  display: grid;
+  position: relative;
+  appearance: none;
+  align-items: center;
+  grid-template-columns: auto 1fr auto;
+  gap: 20px;
+  width: 100%;
+  padding: 9px 0 9px 1px;
+  background: transparent;
+  border-bottom: 1px solid var(--color-opacity-01);
+  text-align: left;
+
+  @include mixins.focus-self-outline;
+}
+
+.entryIconTiny,
+.entryIconSmall,
+.entryIconMed,
+.entryIconLarge {
+  display: block;
+  opacity: 0.5;
+  // background: rgba(255, 0, 0, 0.5);
+}
+
+.entryIconTiny {
+  width: 16px;
+  height: 16px;
+  margin: 3px;
+}
+
+.entryIconSmall {
+  width: 20px;
+  height: 20px;
+  margin: 1px;
+}
+
+.entryIconMed {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  // color: #f009;
+}
+
+.entryIconLarge {
+  width: 26px;
+  height: 26px;
+  margin: -3px -2px -2px;
+  // color: #f00;
+}
+
+.externalIcon {
+  display: inline-block;
+  position: relative;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  margin-left: 10px;
+  opacity: 0.4;
+}
+
+.entryArrow {
+  display: block;
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+}
+
+//
+// SUPPORT
+//
+
+.support {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.github,
+.kofi {
+  display: block;
+  width: 220px;
+  height: 38px;
+  background: #fff;
+  background-image: url(../../../images/support-github.png);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 6px;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+
+  font-size: 0;
+  line-height: 0;
+  text-indent: -9999px;
+
+  @include mixins.focus-self-outline;
+}
+
+.kofi {
+  background-color: #0067fc;
+  background-image: url(../../../images/support-kofi.png);
+}
+
+.legal {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-opacity-03);
+}

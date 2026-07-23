@@ -1,0 +1,128 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.wrap {
+  display: inline-block;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  padding: 6px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--color-opacity-06);
+
+  @include mixins.focus-self-outline;
+
+  .wrapLarge & {
+    padding: 5px 12px;
+    background: var(--color-button-on-primary-bg);
+    border: 1px solid var(--color-button-on-primary-border);
+  }
+  .wrapLarge:not(:first-child) & {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  .wrapLarge:not(:last-child) & {
+    border-right: none;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+.icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  opacity: var(--opacity-06);
+  color: var(--color-text);
+
+  &:first-child {
+    margin: 0 8px 0 0;
+  }
+  &:last-child {
+    margin: 0 0 0 8px;
+  }
+
+  .wrapLarge & {
+    margin: 0 !important;
+    opacity: 1;
+    color: var(--color-opacity-07);
+  }
+}
+
+.label {
+  .wrapLarge & {
+    display: none;
+  }
+}
+
+//
+// DROPDOWN
+//
+
+.content {
+  top: 2px;
+  left: -7px;
+  z-index: 99;
+  padding: 4px;
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  border-radius: 5px;
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  line-height: 14px;
+
+  // Variant used alongside play buttons
+  &Large {
+    top: 4px;
+    left: 0;
+  }
+}
+
+.viewport {
+}
+
+.selectItem {
+  display: block;
+  position: relative;
+  padding: 6px 16px 6px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+
+  @include mixins.focus-self-fill;
+
+  &:hover,
+  &:focus {
+    background: var(--color-secondary-hover);
+  }
+
+  // &[data-state='checked'] {
+  //   color: var(--color-core);
+  // }
+}
+
+.selectIcon {
+  display: inline-block;
+  position: relative;
+  // top: -1px;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+
+  &Middle {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  &Inactive {
+    opacity: var(--opacity-02);
+
+    [data-state='checked'] & {
+      display: none;
+    }
+  }
+}

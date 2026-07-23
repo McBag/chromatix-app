@@ -1,0 +1,27 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.title {
+  margin: 0 0 15px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--color-opacity-05);
+}
+
+.body {
+  font-size: 14px;
+
+  p + p {
+    margin-top: 0.5em;
+  }
+
+  strong {
+    font-weight: bold;
+  }
+}
+
+.legal {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-opacity-03);
+}

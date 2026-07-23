@@ -1,0 +1,55 @@
+// Custom scrollbars (Windows and Linux only)
+
+html[data-scrollbars-custom='true'][data-os='Linux'],
+html[data-scrollbars-custom='true'][data-os='Windows'] {
+  ::-webkit-scrollbar {
+    width: var(--scrollbar-width); // For vertical scrollbar
+    height: var(--scrollbar-width); // For horizontal scrollbar
+    background: var(--color-opacity-01);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    width: var(--scrollbar-width);
+    background: var(--color-opacity-015);
+    border-radius: 0;
+  }
+
+  // Optionally only show scrollbars on hover
+
+  &[data-scrollbars-autohide='true'] {
+    ::-webkit-scrollbar {
+      visibility: hidden;
+    }
+    ::-webkit-scrollbar-track {
+      visibility: hidden;
+    }
+    ::-webkit-scrollbar-thumb {
+      visibility: hidden;
+    }
+
+    .layout-sidebar,
+    .layout-content,
+    .layout-controls,
+    .layout-rightbar,
+    .u-scrollbars,
+    #scrollable {
+      &:hover {
+        &::-webkit-scrollbar {
+          visibility: visible;
+        }
+
+        &::-webkit-scrollbar-track {
+          visibility: visible;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          visibility: visible;
+        }
+      }
+    }
+  }
+}

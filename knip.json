@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["**/*.test.ts"],
+  "ignoreDependencies": ["tslib", "postcss-scss"],
+  "project": ["src/**/*.{ts,tsx,js,jsx}"],
+  "ignore": ["**/_archived/**"],
+  "rules": {
+    "duplicates": "off",
+    "exports": "off",
+    "files": "off"
+  },
+  "tags": ["-lintignore"]
+}

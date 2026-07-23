@@ -1,0 +1,19 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.wrap {
+  padding-bottom: 50px;
+
+  @include mixins.content-padding-regular;
+
+  &.small {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  hr {
+    margin: 36px 0;
+    border: 0;
+    border-top: 1px solid var(--color-opacity-015);
+  }
+}

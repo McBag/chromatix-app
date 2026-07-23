@@ -1,0 +1,153 @@
+@use '../../../css/_config/_mixins';
+@use '../../../css/_config/_vars';
+
+.wrap {
+  width: 100%;
+}
+
+.input {
+  z-index: 2;
+  width: 100%;
+  height: 20px;
+  border-radius: 2px;
+
+  &.inputAccessible {
+    @include mixins.focus-parent-outline;
+  }
+
+  input[type='range'] {
+    display: block;
+    position: relative;
+    appearance: none !important;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border-radius: 6px;
+
+    // @include focus-self-outline;
+
+    // annoyingly these must be duplicated, and
+    // won't work if you comma separate them
+    &::-webkit-slider-thumb {
+      display: none;
+      appearance: none !important;
+      width: 12px;
+      height: 12px;
+      background: var(--color-text);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    &::-moz-range-thumb {
+      display: none;
+      appearance: none !important;
+      width: 12px;
+      height: 12px;
+      background: var(--color-text);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    &::-ms-thumb {
+      display: none;
+      appearance: none !important;
+      width: 12px;
+      height: 12px;
+      background: var(--color-text);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    &:disabled {
+      &::-webkit-slider-thumb {
+        cursor: default;
+      }
+      &::-moz-range-thumb {
+        cursor: default;
+      }
+      &::-ms-thumb {
+        cursor: default;
+      }
+    }
+  }
+
+  &:hover,
+  &:focus {
+    input[type='range'] {
+      // annoyingly these must be duplicated, and
+      // won't work if you comma separate them
+      &::-webkit-slider-thumb {
+        display: block;
+      }
+      &::-moz-range-thumb {
+        display: block;
+      }
+      &::-ms-thumb {
+        display: block;
+      }
+    }
+  }
+}
+
+.track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1px;
+  right: 1px;
+
+  &:before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 0;
+    right: 0;
+    background: var(--color-text);
+    border-radius: 99px;
+    outline: none;
+    opacity: 0.25;
+  }
+}
+
+.fill {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  max-width: 100%;
+  background: var(--color-text);
+  border-radius: 99px;
+
+  .input:hover &,
+  .input:focus & {
+    background: var(--color-core);
+  }
+
+  .inputAccessible & {
+    background: var(--color-core);
+  }
+
+  .inputDisabled & {
+    background: var(--color-text);
+    opacity: var(--opacity-05);
+  }
+}
+
+.inputDisabled {
+  opacity: var(--opacity-04);
+  pointer-events: none;
+}
+
+.inputAccessible {
+  input[type='range'] {
+    &::-webkit-slider-thumb {
+      display: block;
+    }
+    &::-moz-range-thumb {
+      display: block;
+    }
+    &::-ms-thumb {
+      display: block;
+    }
+  }
+}

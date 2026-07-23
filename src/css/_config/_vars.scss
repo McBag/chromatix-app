@@ -1,0 +1,84 @@
+// ======================================================================
+// SASS VARIABLES
+// ======================================================================
+
+$thumbnail: url('/images/artwork-placeholder.png');
+
+// DIMENSIONS
+
+$sidebar-width-lg: 200px;
+$sidebar-width-xl: 220px;
+// $sidebar-width-xxl: 230px;
+
+$breakpoints: (
+  xxs: 375px,
+  xs: 440px,
+  sm: 580px,
+  md: 768px,
+  lg: 1024px,
+  xl: 1280px,
+  xxl: 1440px,
+  xxxl: 1680px,
+  max: 1840px,
+);
+
+$wrapper-paddings: (
+  0: (
+    x: 14px,
+  ),
+  xxs: (
+    x: 18px,
+  ),
+  sm: (
+    x: 24px,
+  ),
+  md: (
+    x: 35px,
+  ),
+  xl: (
+    x: 45px,
+  ),
+  xxxl: (
+    x: 60px,
+  ),
+);
+
+$outsets: (
+  0: 14px,
+  xxs: 18px,
+  sm: 24px,
+  md: 35px,
+  xl: 45px,
+  xxxl: 60px,
+  max: 30px,
+);
+// xxl: 30px,
+// xxxl: 30px,
+
+// GRID
+
+$grid-cols: 12;
+$grid-max-width: 1500px; // 1370px; // 1440px - 35px side padding
+$grid-padding: (
+  0: 8px,
+  md: 10px, // lg: 12px,
+);
+$grid-breakpoints: (xxs, xs, sm, md, lg, xl);
+
+// COLORS
+
+$color-core: #f7277a;
+$color-text: #fff;
+$color-primary-bg: #021c27;
+// $color-secondary-bg: #142c38;
+$color-secondary-border: #263e4a;
+
+$color-button-mono-bg: #eeeeee;
+$color-button-mono-border: #fff;
+$color-button-mono-text: #021c27;
+
+$color-button-secondary-bg: #263e4a;
+$color-button-secondary-border: rgba(255, 255, 255, 0.1);
+$color-button-secondary-text: #fff;
+
+$color-opacity-015: rgba(255, 255, 255, 0.15);

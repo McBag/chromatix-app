@@ -1,0 +1,149 @@
+// ======================================================================
+// IMPORTS
+// ======================================================================
+
+import { useRef } from 'react';
+import { useDispatch } from 'react-redux';
+import clsx from 'clsx';
+
+import { Icon } from 'js/components';
+import { useNearTop } from 'js/hooks';
+
+import style from './TitleHeading.module.scss';
+
+// ======================================================================
+// COMPONENT
+// ======================================================================
+
+const TitleHeading = ({
+  title,
+  subtitle,
+  detail,
+  thumb,
+  thumbExpand,
+  icon,
+  showPlay,
+  showQueue,
+  optionsMenu,
+  handlePlay,
+  handleQueue,
+  isLoaded = false,
+  isPlaying = false,
+  filters,
+  padding = true,
+}) => {
+  const dispatch = useDispatch();
+
+  const triggerRef = useRef(null);
+  const isNearTop = useNearTop(triggerRef, 90);
+
+  const titleLength = typeof title === 'string' ? title.replace(/<[^>]*>/g, '').length : 0;
+  const titleSize = titleLength <= 10 ? 'xl' : titleLength <= 30 ? 'lg' : titleLength <= 40 ? 'md' : 'sm';
+
+  return (
+    <>
+      <div
+        className={clsx(style.stickyWrap, { [style.stickyWrapVisible]: isNearTop, [style.stickyWrapPadding]: padding })}
+      >
+        <div className={style.stickyContent}>{title && <h1 className={clsx(style.stickyTitle)}>{title}</h1>}</div>
+      </div>
+      <div className={clsx(style.wrap, { [style.wrapPadding]: padding })}>
+        {thumb && (
+          <button
+            type="button"
+            className={style.thumb}
+            onClick={() => {
+              dispatch.dialogModel.showModal({
+                modal: 'ImagePreview',
+                data: { src: thumbExpand || thumb, title },
+              });
+            }}
+          >
+            <img src={thumb} alt={title} draggable="false" />
+          </button>
+        )}
+
+        {icon && (
+          <div className={style.thumbBg}>
+            <div className={style.thumbIcon}>
+              <Icon icon={icon} cover stroke strokeWidth={1.6} />
+            </div>
+          </div>
+        )}
+
+        {!icon && thumb === null && <div className={style.thumb}></div>}
+
+        <div className={style.content}>
+          {title && <h1 className={clsx(style.title, style[titleSize])}>{title}</h1>}
+
+          {subtitle && <h2 className={style.subtitle}>{subtitle}</h2>}
+
+          {detail && <div className={style.detail}>{detail}</div>}
+
+          {(showPlay || showQueue || optionsMenu) && (
+            <div className={style.buttons}>
+              {showPlay && (
+                <>
+                  <button
+                    type="button"
+                    className={style.playButton}
+                    onClick={() =>
+                      isPlaying
+                        ? dispatch.playerModel.playerPause()
+                        : isLoaded
+                          ? dispatch.playerModel.playerResume()
+                          : handlePlay && handlePlay(false)
+                    }
+                  >
+                    {!isPlaying ? (
+                      <span className={style.playIcon}>
+                        <Icon icon="PlayFilledIcon" cover />
+                      </span>
+                    ) : (
+                      <span className={style.pauseIcon}>
+                        <Icon icon="PauseFilledIcon" cover />
+                      </span>
+                    )}
+                    <span className={style.playText}>{isPlaying ? 'Pause' : isLoaded ? 'Resume' : 'Play'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={style.shuffleButton}
+                    onClick={() => handlePlay && handlePlay(true)}
+                    aria-label="Shuffle"
+                  >
+                    <span className={style.shuffleIcon}>
+                      <Icon icon="ShuffleIcon" cover stroke strokeWidth={1.4} />
+                    </span>
+                    {/* <span className={style.shuffleText}>Shuffle</span> */}
+                  </button>
+                </>
+              )}
+
+              {showQueue && (
+                <button type="button" className={style.queueButton} onClick={() => handleQueue && handleQueue()}>
+                  <span className={style.queueIcon}>
+                    <Icon icon="QueueIcon" cover stroke strokeWidth={1.4} />
+                  </span>
+                  <span className={style.queueText}>Queue</span>
+                </button>
+              )}
+
+              {optionsMenu && optionsMenu}
+            </div>
+          )}
+          {filters && <div className={style.filters}>{filters}</div>}
+        </div>
+
+        <div ref={triggerRef} className={style.stickyTrigger}></div>
+      </div>
+    </>
+  );
+};
+
+// ======================================================================
+// EXPORT
+// ======================================================================
+
+export default TitleHeading;
