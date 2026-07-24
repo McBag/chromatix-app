@@ -5,11 +5,12 @@
   "license": "UNLICENSED",
   "private": true,
   "type": "module",
-  "homepage": "/",
+  "homepage": ".",
   "scripts": {
     "start": "npm run dev",
     "dev": "VITE_VERSION=$npm_package_version VITE_DATE=$(date +%s) vite",
     "build": "VITE_VERSION=$npm_package_version VITE_DATE=$(date +%s) vite build",
+    "build:win": "node lib/build-win.mjs",
     "build:analyze": "VITE_VERSION=$npm_package_version VITE_DATE=$(date +%s) ANALYZE=true vite build",
     "preview": "vite preview",
     "release:stage": "release-it --config .release-staging.json",

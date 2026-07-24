@@ -23,8 +23,10 @@ import {
   useElectronStatus,
   useGotRequiredData,
   useNetworkStatus,
+  usePlaybackKeepAlive,
   useScrollRestoration,
   useStyleOptions,
+  useTeslaOptimization,
   useWindowSize,
 } from 'js/hooks';
 import { ErrorPage } from 'js/pages';
@@ -70,8 +72,16 @@ const App = () => {
   useColorTheme();
   useElectronStatus();
   useNetworkStatus();
+  usePlaybackKeepAlive();
   useScrollRestoration();
   useStyleOptions();
+  useTeslaOptimization();
+
+  useEffect(() => {
+    if (inited) {
+      document.getElementById('app-boot-loader')?.remove();
+    }
+  }, [inited]);
 
   // disable console logs in production
   useEffect(() => {

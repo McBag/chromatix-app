@@ -23,8 +23,10 @@ const TitleHeading = ({
   thumbExpand,
   icon,
   showPlay,
+  showQueue,
   optionsMenu,
   handlePlay,
+  handleQueue,
   isLoaded = false,
   isPlaying = false,
   filters,
@@ -78,7 +80,7 @@ const TitleHeading = ({
 
           {detail && <div className={style.detail}>{detail}</div>}
 
-          {(showPlay || optionsMenu) && (
+          {(showPlay || showQueue || optionsMenu) && (
             <div className={style.buttons}>
               {showPlay && (
                 <>
@@ -117,6 +119,15 @@ const TitleHeading = ({
                     {/* <span className={style.shuffleText}>Shuffle</span> */}
                   </button>
                 </>
+              )}
+
+              {showQueue && (
+                <button type="button" className={style.queueButton} onClick={() => handleQueue && handleQueue()}>
+                  <span className={style.queueIcon}>
+                    <Icon icon="QueueIcon" cover stroke strokeWidth={1.4} />
+                  </span>
+                  <span className={style.queueText}>Queue</span>
+                </button>
               )}
 
               {optionsMenu && optionsMenu}

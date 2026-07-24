@@ -252,19 +252,24 @@
 }
 
 .playButton,
-.shuffleButton {
+.shuffleButton,
+.queueButton {
   display: inline-flex;
   position: relative;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  height: 40px;
+  min-height: 40px;
   min-width: 84px;
-  padding: 3px 8px;
+  padding: 0 14px;
   background: var(--color-core);
   border: 1px solid var(--color-opacity-01);
   border-radius: 6px;
 
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 1;
   font-weight: bold;
   color: var(--color-primary-bg);
 
@@ -273,23 +278,32 @@
 
 .shuffleButton {
   min-width: 40px;
+  padding: 0 12px;
 }
 
 .playIcon,
 .pauseIcon,
-.shuffleIcon {
+.shuffleIcon,
+.queueIcon {
   display: block;
   position: relative;
-  width: 11px;
-  height: 11px;
-  margin: 2px 5px 2px 0;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0 6px 0 0;
 }
 
 .shuffleIcon {
   width: 16px;
   height: 16px;
-  // margin: 0 4px 0 -3px;
-  margin: 0 0 0 0;
+  margin: 0;
+}
+
+.playText,
+.shuffleText,
+.queueText {
+  display: inline-block;
+  line-height: 1;
 }
 
 //

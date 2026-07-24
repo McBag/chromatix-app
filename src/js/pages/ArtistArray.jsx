@@ -5,6 +5,7 @@
 import { useSelector } from 'react-redux';
 
 import {
+  AlphabetNav,
   FilterMenu,
   FilterSelect,
   FilterToggle,
@@ -23,6 +24,7 @@ import platformFeatures from 'js/_config/platformFeatures';
 
 const ArtistArray = ({ pageTitle = 'Artists', pageVariant = 'Artists', singularName = 'Artist' }) => {
   const currentService = useSelector(({ appModel }) => appModel.currentService);
+  const queueIsVisible = useSelector(({ sessionModel }) => sessionModel.queueIsVisible);
   const platformOpts = platformFeatures[currentService] || {};
 
   const {
@@ -121,6 +123,9 @@ const ArtistArray = ({ pageTitle = 'Artists', pageVariant = 'Artists', singularN
             viewArtists={viewArtists}
           />
         </ViewList>
+      )}
+      {(isGridView || isListView) && sortArtists === 'title' && orderArtists === 'asc' && (
+        <AlphabetNav entries={sortedArtists} queueVisible={queueIsVisible} />
       )}
     </>
   );

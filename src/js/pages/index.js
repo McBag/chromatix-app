@@ -23,6 +23,8 @@ export { default as AlbumArtistDetail } from './AlbumArtistDetail';
 
 export { default as AlbumArray } from './AlbumArray';
 export { default as AlbumDetail } from './AlbumDetail';
+export { default as RecentlyAdded } from './RecentlyAdded';
+export { default as RandomAlbums } from './RandomAlbums';
 export { default as AlbumCollectionArray } from './AlbumCollectionArray';
 export { default as AlbumCollectionItems } from './AlbumCollectionItems';
 export { default as AlbumGenreArray } from './AlbumGenreArray';

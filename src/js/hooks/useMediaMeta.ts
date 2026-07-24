@@ -1,9 +1,13 @@
 import { useEffect } from 'react';
 
+import { teslaSetMetadataFromTrack } from 'js/utils/teslaArtworkFix';
+
 interface MediaMetadataInit {
   title?: string;
   artist?: string;
   album?: string;
+  thumbSm?: string;
+  thumbMd?: string;
   artwork?: {
     src: string;
     sizes?: string;
@@ -12,16 +16,13 @@ interface MediaMetadataInit {
 }
 
 /**
- * Custom hook that sets media metadata for the browser's Media Session API.
- * Updates the metadata displayed in media notifications and control centers.
- * @param metadata - Media metadata object with title, artist, album, and artwork
+ * Sets Media Session metadata for lock screens / car UIs.
+ * Title is formatted as "Artist - Title" for Tesla line 1; artwork is preserved.
  */
-
-const useMediaMeta = (metadata: MediaMetadataInit): null => {
+const useMediaMeta = (metadata: MediaMetadataInit | null): null => {
   useEffect(() => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata(metadata);
-    }
+    if (!metadata) return;
+    teslaSetMetadataFromTrack(metadata);
   }, [metadata]);
 
   return null;

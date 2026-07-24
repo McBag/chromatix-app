@@ -443,7 +443,10 @@ const transposeTrackData = (track, libraryId, serverBaseUrl, accessToken) => {
   const isLikelyAppearance = track.originalTitle && track.originalTitle !== track.grandparentTitle;
 
   const artistTitle = isLikelyAppearance ? track.originalTitle : track.grandparentTitle;
-  const artistLink = isLikelyAppearance ? null : '/libraries/' + libraryId + '/artists/' + track.grandparentRatingKey;
+  // Album artist id (grandparent) — needed for adjacent-album autoplay even on appearances.
+  const artistId = track.grandparentRatingKey || null;
+  // Keep appearance links null so the UI does not jump to the album artist by mistake.
+  const artistLink = isLikelyAppearance || !artistId ? null : '/libraries/' + libraryId + '/artists/' + artistId;
 
   const originalSrc = `${serverBaseUrl}${track.Media[0].Part[0].key}?X-Plex-Token=${accessToken}`;
 
@@ -456,6 +459,7 @@ const transposeTrackData = (track, libraryId, serverBaseUrl, accessToken) => {
     title: track.title,
     // addedAt: track.addedAt,
     artist: artistTitle,
+    artistId: artistId,
     artistLink: artistLink,
     album: track.parentTitle,
     albumId: track.parentRatingKey,

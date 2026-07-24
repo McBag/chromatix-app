@@ -27,6 +27,10 @@ export const SettingsPlayback = () => {
 
 const GeneralSettings = () => {
   const switchToTrackViewOnArtistPlay = useSelector(({ sessionModel }) => sessionModel.switchToTrackViewOnArtistPlay);
+  const autoPlayPreviousAlbumOnAlbumEnd = useSelector(
+    ({ sessionModel }) => sessionModel.autoPlayPreviousAlbumOnAlbumEnd
+  );
+  const autoPlayNextAlbumByReleaseYear = useSelector(({ sessionModel }) => sessionModel.autoPlayNextAlbumByReleaseYear);
 
   const menuItems = [
     {
@@ -35,6 +39,19 @@ const GeneralSettings = () => {
       description:
         'When enabled, if you start artist playback from an artist page while in grid or list view, the app will switch to track view and highlight the currently playing track. When disabled, it will keep you in grid or list view instead.',
       state: switchToTrackViewOnArtistPlay,
+    },
+    {
+      key: 'autoPlayPreviousAlbumOnAlbumEnd',
+      label: 'Automatically continue with another album by the same artist.',
+      description: '',
+      state: autoPlayPreviousAlbumOnAlbumEnd,
+    },
+    {
+      key: 'autoPlayNextAlbumByReleaseYear',
+      label: 'Play the next album by release year (disable for previous album).',
+      description: '',
+      state: autoPlayNextAlbumByReleaseYear,
+      disabled: !autoPlayPreviousAlbumOnAlbumEnd,
     },
   ];
 

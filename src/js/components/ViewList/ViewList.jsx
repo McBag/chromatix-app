@@ -2,7 +2,7 @@
 // IMPORTS
 // ======================================================================
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -361,6 +361,17 @@ const TableBodyStatic = ({
 }) => {
   useScrollToTrack();
 
+  useEffect(() => {
+    const onScrollToIndex = (event) => {
+      const index = event.detail?.index;
+      if (index == null) return;
+      document.querySelector(`[data-entry-index="${index}"]`)?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    };
+
+    window.addEventListener('chromatix-scroll-to-index', onScrollToIndex);
+    return () => window.removeEventListener('chromatix-scroll-to-index', onScrollToIndex);
+  }, []);
+
   const scrollContainerRef = useRef(null);
 
   const rowHeight = noArtworkVisible ? rowHeightSmall : rowHeightDefault;
@@ -372,6 +383,8 @@ const TableBodyStatic = ({
     rowHeight,
     isDraggable,
   });
+
+  let standardEntryIndex = 0;
 
   return (
     <div
@@ -434,10 +447,13 @@ const TableBodyStatic = ({
 
           // Standard rows
           else {
+            const entryIndex = standardEntryIndex++;
+
             return (
               <StandardRow
                 key={index}
                 entry={entry}
+                entryIndex={entryIndex}
                 tableVariant={tableVariant}
                 tableOptions={tableOptions}
                 gridTemplateColumns={gridTemplateColumns}
@@ -593,6 +609,35 @@ const TableBodyVirtual = ({
   );
   useScrollToVirtualTrack(entries, scrollToVirtualTrack);
 
+  const scrollToEntryIndex = useCallback(
+    (targetIndex) => {
+      const arrayIndex = entries.findIndex((entry, i) => {
+        if (entry?.kind) return false;
+        const standardIndex = entries.slice(0, i + 1).filter((e) => !e?.kind).length - 1;
+        return standardIndex === targetIndex;
+      });
+
+      if (arrayIndex >= 0) {
+        rowVirtualizer.scrollToIndex(arrayIndex + fixedElementCount, {
+          align: 'start',
+          behavior: 'auto',
+        });
+      }
+    },
+    [entries, rowVirtualizer]
+  );
+
+  useEffect(() => {
+    const onScrollToIndex = (event) => {
+      const index = event.detail?.index;
+      if (index == null) return;
+      scrollToEntryIndex(index);
+    };
+
+    window.addEventListener('chromatix-scroll-to-index', onScrollToIndex);
+    return () => window.removeEventListener('chromatix-scroll-to-index', onScrollToIndex);
+  }, [scrollToEntryIndex]);
+
   return (
     <div
       ref={outerRef}
@@ -675,10 +720,15 @@ const TableBodyVirtual = ({
 
             // Standard rows
             else {
+              const entryIndex = entries
+                .slice(0, virtualEntry.index - fixedElementCount + 1)
+                .filter((e) => !e?.kind).length - 1;
+
               return (
                 <StandardRow
                   key={virtualEntry.index}
                   entry={entry}
+                  entryIndex={entryIndex}
                   virtualEntry={virtualEntry}
                   tableVariant={tableVariant}
                   tableOptions={tableOptions}
@@ -773,14 +823,24 @@ const DiscRow = ({ virtualEntry, entry }) => {
 // STANDARD ROW
 // ======================================================================
 
-const StandardRow = ({ virtualEntry, entry, tableVariant, tableOptions, gridTemplateColumns }) => {
+const StandardRow = ({ virtualEntry, entry, entryIndex, tableVariant, tableOptions, gridTemplateColumns }) => {
+  const currentLibraryId = useSelector(({ sessionModel }) => sessionModel.currentLibrary?.libraryId);
   const { ratingType, ratingKey } = lookupVariantFields[tableVariant] || {};
   const rowKey = entry.albumId || entry.artistId || entry.playlistId || entry.collectionId;
+  const resolvedArtistLink =
+    entry.artistLink ||
+    (entry.artistId && currentLibraryId ? `/libraries/${currentLibraryId}/artists/${entry.artistId}` : null);
+  const rowLink =
+    entry.link ||
+    (tableVariant === 'artists' && entry.artistId && currentLibraryId
+      ? `/libraries/${currentLibraryId}/artists/${entry.artistId}`
+      : entry.link);
 
   return (
     <NavLink
       className={style.entry}
-      to={entry.link}
+      to={rowLink}
+      data-entry-index={tableVariant === 'artists' && entryIndex >= 0 ? entryIndex : undefined}
       draggable="false"
       style={{
         ...(virtualEntry && {
@@ -807,7 +867,12 @@ const StandardRow = ({ virtualEntry, entry, tableVariant, tableOptions, gridTemp
             case 'artist':
               return (
                 <div key={rowKey + '-' + index} className={clsx(style.artist, 'text-trim')}>
-                  {entry.artist}
+                  {resolvedArtistLink && (
+                    <NavLink to={resolvedArtistLink} tabIndex={-1} draggable="false">
+                      {entry.artist}
+                    </NavLink>
+                  )}
+                  {!resolvedArtistLink && entry.artist}
                 </div>
               );
 

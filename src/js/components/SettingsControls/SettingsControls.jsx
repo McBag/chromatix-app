@@ -30,6 +30,7 @@ export const SettingsControls = () => {
 const NowPlayingSettings = ({ platformOpts }) => {
   const controlBarTitle = useSelector(({ sessionModel }) => sessionModel.controlBarTitle);
   const controlBarArtist = useSelector(({ sessionModel }) => sessionModel.controlBarArtist);
+  const controlBarAlbum = useSelector(({ sessionModel }) => sessionModel.controlBarAlbum);
   const controlBarIsFavourite = useSelector(({ sessionModel }) => sessionModel.controlBarIsFavourite);
   const controlBarUserRating = useSelector(({ sessionModel }) => sessionModel.controlBarUserRating);
 
@@ -43,6 +44,11 @@ const NowPlayingSettings = ({ platformOpts }) => {
       key: 'controlBarArtist',
       label: 'Artist',
       state: controlBarArtist,
+    },
+    {
+      key: 'controlBarAlbum',
+      label: 'Album',
+      state: controlBarAlbum,
     },
     ...(platformOpts.enableIsFavourite
       ? [

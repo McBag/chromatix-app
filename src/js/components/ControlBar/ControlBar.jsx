@@ -8,7 +8,7 @@ import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 
 import { Favourite, Icon, PopoverMenu, RangeSlider, StarRating } from 'js/components';
-import { useKeyPlaybackControls, useKeyMediaControls, useMediaMeta, usePlayerProgress } from 'js/hooks';
+import { useKeyPlaybackControls, useKeyMediaControls, useMediaControls, useMediaMeta, usePlayerProgress } from 'js/hooks';
 import { analyticsEvent, durationToStringShort } from 'js/utils';
 import platformFeatures from 'js/_config/platformFeatures';
 
@@ -22,12 +22,12 @@ const ControlBar = () => {
   return (
     <div className={style.wrap} data-allow-key-controls>
       <div className={style.leftSection}>
-        <NowPlaying />
+        <PrimaryControls />
+        <ControlProgress />
       </div>
 
       <div className={style.centerSection}>
-        <PrimaryControls />
-        <ControlProgress />
+        <NowPlaying />
       </div>
 
       <div className={style.rightSection}>
@@ -42,6 +42,7 @@ const NowPlaying = () => {
 
   const controlBarTitle = useSelector(({ sessionModel }) => sessionModel.controlBarTitle);
   const controlBarArtist = useSelector(({ sessionModel }) => sessionModel.controlBarArtist);
+  const controlBarAlbum = useSelector(({ sessionModel }) => sessionModel.controlBarAlbum);
   const controlBarIsFavourite = useSelector(({ sessionModel }) => sessionModel.controlBarIsFavourite);
   const controlBarUserRating = useSelector(({ sessionModel }) => sessionModel.controlBarUserRating);
 
@@ -81,46 +82,72 @@ const NowPlaying = () => {
       </div>
 
       <div className={style.detailsWrap}>
-        {trackCurrent && (
-          <>
-            {controlBarTitle && <div className={style.title}>{trackCurrent.title}</div>}
+        {/* Always reserve fixed line slots when enabled so the bar never shifts between songs. */}
+        {controlBarTitle && (
+          <div className={style.title}>
+            {trackCurrent?.title || <span className={style.linePlaceholder}>–</span>}
+          </div>
+        )}
 
-            {controlBarArtist && (
-              <div className={style.artist}>
-                {trackCurrent.artistLink && (
-                  <NavLink to={trackCurrent.artistLink} draggable="false">
-                    {trackCurrent.artist}
-                  </NavLink>
-                )}
-                {!trackCurrent.artistLink && trackCurrent.artist}
-              </div>
+        {controlBarArtist && (
+          <div className={style.artist}>
+            {trackCurrent?.artistLink ? (
+              <NavLink to={trackCurrent.artistLink} draggable="false">
+                {trackCurrent.artist}
+              </NavLink>
+            ) : trackCurrent?.artist ? (
+              trackCurrent.artist
+            ) : (
+              <span className={style.linePlaceholder}>–</span>
             )}
+          </div>
+        )}
 
+        {controlBarAlbum && (
+          <div className={style.album}>
+            {trackCurrent?.albumLink ? (
+              <NavLink to={trackCurrent.albumLink} draggable="false">
+                {trackCurrent.album}
+              </NavLink>
+            ) : trackCurrent?.album ? (
+              trackCurrent.album
+            ) : (
+              <span className={style.linePlaceholder}>–</span>
+            )}
+          </div>
+        )}
+
+        {(controlBarIsFavourite && platformOpts?.enableIsFavourite) ||
+        (controlBarUserRating && platformOpts?.enableUserRating) ? (
+          <div className={style.metaRow}>
             {controlBarIsFavourite && platformOpts?.enableIsFavourite && (
               <div className={style.favourite}>
-                <Favourite
-                  type="track"
-                  itemId={trackCurrent.trackId}
-                  isFavourite={trackCurrent.isFavourite}
-                  size={14}
-                  editable
-                />
+                {trackCurrent ? (
+                  <Favourite
+                    type="track"
+                    itemId={trackCurrent.trackId}
+                    isFavourite={trackCurrent.isFavourite}
+                    size={14}
+                    editable
+                  />
+                ) : null}
               </div>
             )}
-
             {controlBarUserRating && platformOpts?.enableUserRating && (
               <div className={style.rating}>
-                <StarRating
-                  type="track"
-                  ratingKey={trackCurrent.trackId}
-                  rating={trackCurrent.userRating}
-                  editable
-                  size={13}
-                />
+                {trackCurrent ? (
+                  <StarRating
+                    type="track"
+                    ratingKey={trackCurrent.trackId}
+                    rating={trackCurrent.userRating}
+                    editable
+                    size={13}
+                  />
+                ) : null}
               </div>
             )}
-          </>
-        )}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -156,18 +183,28 @@ export const PrimaryControls = ({ fullPageMode }) => {
   );
 
   const trackMeta = useMemo(() => {
-    return trackCurrent
-      ? {
-          title: trackCurrent.title,
-          artist: trackCurrent.artist,
-          album: trackCurrent.album,
-          artwork: [{ src: trackCurrent.thumbSm ? trackCurrent.thumbSm : null }],
-        }
-      : null;
+    if (!trackCurrent) return null;
+
+    const artwork = [];
+    if (trackCurrent.thumbMd) {
+      artwork.push({ src: trackCurrent.thumbMd, sizes: '512x512', type: 'image/jpeg' });
+    } else if (trackCurrent.thumbSm) {
+      artwork.push({ src: trackCurrent.thumbSm, sizes: '256x256', type: 'image/jpeg' });
+    }
+
+    return {
+      title: trackCurrent.title,
+      artist: trackCurrent.artist,
+      album: trackCurrent.album,
+      thumbMd: trackCurrent.thumbMd,
+      thumbSm: trackCurrent.thumbSm,
+      artwork,
+    };
   }, [trackCurrent]);
 
   useKeyPlaybackControls(controlHandlers);
   useKeyMediaControls(controlHandlers);
+  useMediaControls(controlHandlers);
   useMediaMeta(trackMeta);
 
   return (

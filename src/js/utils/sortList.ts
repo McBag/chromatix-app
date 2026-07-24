@@ -328,4 +328,40 @@ const compareStringsWithArticles = (
   return valueA.localeCompare(valueB, undefined, { numeric: true });
 };
 
+const normalizeAlphabetChar = (char: string): string => {
+  return char.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
+};
+
+/**
+ * First letter bucket for AlphabetNav. Diacritics are normalized (Ü → U);
+ * numbers/symbols map to "#". Uses the same leading-article rules as sort.
+ */
+export const getAlphabetLetter = (
+  title: string | undefined,
+  { ignoreLeadingArticles = true }: { ignoreLeadingArticles?: boolean } = {}
+): string => {
+  let value = (title || '').trim();
+  if (!value) return '#';
+
+  if (ignoreLeadingArticles) {
+    value = removeLeadingArticle(value.toUpperCase());
+  } else {
+    value = value.toUpperCase();
+  }
+
+  const firstChar = normalizeAlphabetChar(value[0] || '');
+  if (!firstChar) return '#';
+  if (/^[0-9]$/.test(firstChar)) return '#';
+  if (/^[A-Z]$/.test(firstChar)) return firstChar;
+  return '#';
+};
+
+export const findAlphabetEntryIndex = (
+  entries: Entry[],
+  letter: string,
+  { ignoreLeadingArticles = true }: { ignoreLeadingArticles?: boolean } = {}
+): number => {
+  return entries.findIndex((entry) => getAlphabetLetter(entry.title, { ignoreLeadingArticles }) === letter);
+};
+
 export default sortList;

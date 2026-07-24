@@ -131,6 +131,17 @@ const ListBodyStatic = ({
 }) => {
   useScrollToTrack();
 
+  useEffect(() => {
+    const onScrollToIndex = (event) => {
+      const index = event.detail?.index;
+      if (index == null) return;
+      document.querySelector(`[data-entry-index="${index}"]`)?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    };
+
+    window.addEventListener('chromatix-scroll-to-index', onScrollToIndex);
+    return () => window.removeEventListener('chromatix-scroll-to-index', onScrollToIndex);
+  }, []);
+
   // If items are grouped, we need to add a group row before each group
   const entriesWithGroups = !groupBy
     ? entries
@@ -147,12 +158,18 @@ const ListBodyStatic = ({
       <div id="scrollable-inner" className={style.scrollableInner}>
         {titleBlock}
 
-        {entriesWithGroups.map((entry, index) => {
-          const entryKey = getEntryKey(entry, index);
+        {(() => {
+          let entryIndexCounter = 0;
 
-          if (entry.kind === 'group') {
-            return <GroupRow key={index} entry={entry} />;
-          } else {
+          return entriesWithGroups.map((entry, index) => {
+            const entryKey = getEntryKey(entry, index);
+
+            if (entry.kind === 'group') {
+              return <GroupRow key={index} entry={entry} />;
+            }
+
+            const entryIndex = entryIndexCounter++;
+
             return (
               <ListEntry
                 key={variant + '-' + entryKey}
@@ -165,11 +182,12 @@ const ListBodyStatic = ({
                 showRatings={showRatings}
                 isCurrentlyLoaded={isCurrentlyLoaded(variant, entryKey)}
                 isCurrentlyPlaying={playerPlaying}
+                entryIndex={entryIndex}
                 {...entry}
               />
             );
-          }
-        })}
+          });
+        })()}
       </div>
     </div>
   );
@@ -315,6 +333,28 @@ const ListBodyVirtual = ({
   );
   useScrollToVirtualTrack(entries, scrollToVirtualTrack);
 
+  const scrollToEntryIndex = useCallback(
+    (index) => {
+      const virtualRowIndex = Math.floor(index / numColumns) + fixedElementCount;
+      rowVirtualizer.scrollToIndex(virtualRowIndex, {
+        align: 'start',
+        behavior: 'auto',
+      });
+    },
+    [rowVirtualizer, numColumns]
+  );
+
+  useEffect(() => {
+    const onScrollToIndex = (event) => {
+      const index = event.detail?.index;
+      if (index == null) return;
+      scrollToEntryIndex(index);
+    };
+
+    window.addEventListener('chromatix-scroll-to-index', onScrollToIndex);
+    return () => window.removeEventListener('chromatix-scroll-to-index', onScrollToIndex);
+  }, [scrollToEntryIndex]);
+
   return (
     <div ref={outerRef} id="scrollable" className={clsx(style.scrollableOuter, style.scrollableOuterVirtual)}>
       <div
@@ -370,6 +410,7 @@ const ListBodyVirtual = ({
                   showRatings={showRatings}
                   isCurrentlyLoaded={isCurrentlyLoaded(variant, entryKey)}
                   isCurrentlyPlaying={playerPlaying}
+                  entryIndex={i}
                   {...entry}
                 />
               );
@@ -492,9 +533,23 @@ const ListEntry = React.memo(
 
     isCurrentlyLoaded,
     isCurrentlyPlaying,
+    entryIndex,
   }) => {
     const history = useHistory();
     const dispatch = useDispatch();
+    const currentLibraryId = useSelector(({ sessionModel }) => sessionModel.currentLibrary?.libraryId);
+
+    const resolvedArtistLink =
+      artistLink ||
+      (artistId && currentLibraryId ? `/libraries/${currentLibraryId}/artists/${artistId}` : null);
+
+    const entryLink =
+      link ||
+      (variant === 'albums' && albumId && currentLibraryId
+        ? `/libraries/${currentLibraryId}/albums/${albumId}`
+        : variant === 'artists' && artistId && currentLibraryId
+          ? `/libraries/${currentLibraryId}/artists/${artistId}`
+          : null);
 
     // Play button handler
     const handlePlay = useCallback(
@@ -538,11 +593,21 @@ const ListEntry = React.memo(
     // Handle card click
     const handleCardClick = useCallback(
       (_event) => {
-        if (link) {
-          history.push(link);
+        if (entryLink) {
+          history.push(entryLink);
         }
       },
-      [link, history]
+      [entryLink, history]
+    );
+
+    const handleQueue = useCallback(
+      (event) => {
+        event.stopPropagation();
+        if (albumId) {
+          dispatch.playerModel.addAlbumToQueue({ albumId });
+        }
+      },
+      [albumId, dispatch]
     );
 
     // Handle card double click
@@ -599,7 +664,13 @@ const ListEntry = React.memo(
     return (
       <div
         id={variant === 'folders' && trackId ? trackId : null}
-        className={clsx(style.card, { [style.cardCurrent]: isCurrentlyLoaded, [style.cardLink]: link })}
+        data-entry-index={entryIndex >= 0 ? entryIndex : undefined}
+        className={clsx(style.card, {
+          [style.cardCurrent]: isCurrentlyLoaded,
+          [style.cardLink]: entryLink,
+          [style.cardAlbums]: variant === 'albums',
+          [style.cardArtistAlbums]: variant === 'artistAlbums',
+        })}
         onClick={handleCardClick}
         onDoubleClick={handleCardDoubleClick}
         onKeyDown={handleKeyDown}
@@ -614,6 +685,20 @@ const ListEntry = React.memo(
           {isIconCard && (
             <div className={style.icon}>
               <Icon icon={iconImage} cover stroke strokeWidth={1.6} />
+            </div>
+          )}
+
+          {(variant === 'albums' || variant === 'artistAlbums') && (
+            <div className={style.moreButtonWrap}>
+              <button
+                type="button"
+                className={style.moreButton}
+                onClick={handleQueue}
+                tabIndex={-1}
+                aria-label="Add album to queue"
+              >
+                <Icon icon="QueueIcon" cover stroke strokeWidth={1.4} />
+              </button>
             </div>
           )}
 
@@ -657,12 +742,12 @@ const ListEntry = React.memo(
             </div>
           )}
 
-          {artist && !artistLink && <div className={clsx(style.subtitle, 'text-trim')}>{artist}</div>}
+          {artist && !resolvedArtistLink && <div className={clsx(style.subtitle, 'text-trim')}>{artist}</div>}
 
-          {artist && artistLink && (
+          {artist && resolvedArtistLink && (
             <NavLink
               className={clsx(style.subtitle, 'text-trim')}
-              to={artistLink}
+              to={resolvedArtistLink}
               onClick={handleLinkClick}
               tabIndex={-1}
               draggable="false"

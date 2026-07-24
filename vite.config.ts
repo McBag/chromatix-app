@@ -21,6 +21,9 @@ const fullReloadOnHooksChange = {
 };
 
 export default defineConfig({
+  // Relative asset URLs so the build works under Tesla / subdirectory hosts
+  // and matches the CRA layout the server already expects (static/js|css|media).
+  base: './',
   appType: 'spa',
   plugins: [
     react(),
@@ -38,21 +41,24 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
+    // Keep empty so entry/chunk/asset file names control the full path under build/
+    assetsDir: 'static',
     sourcemap: false,
     target: 'es2020',
     rolldownOptions: {
       output: {
-        // Code splitting
+        // CRA-compatible folder layout for Tesla static hosting:
+        //   static/js/*.js  static/css/*.css  static/media/*
+        entryFileNames: 'static/js/[name].[hash].js',
+        chunkFileNames: 'static/js/[name].[hash].js',
+        assetFileNames: (assetInfo) => {
+          const fileName = assetInfo.names?.[0] || assetInfo.name || '';
+          if (fileName.endsWith('.css')) {
+            return 'static/css/[name].[hash][extname]';
+          }
+          return 'static/media/[name].[hash][extname]';
+        },
         manualChunks: (id) => {
-          // if (
-          //   id.includes('node_modules/react/') ||
-          //   id.includes('node_modules/react-dom/') ||
-          //   id.includes('node_modules/react-redux/') ||
-          //   id.includes('node_modules/react-router-dom/') ||
-          //   id.includes('node_modules/scheduler/')
-          // ) {
-          //   return 'vendor';
-          // }
           if (id.includes('node_modules/@radix-ui/')) {
             return 'radix';
           }

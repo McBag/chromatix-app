@@ -446,45 +446,47 @@ export const getAllAlbumArtists = () => {
 
 // ======================================================================
 // GET ARTIST DETAILS
+// Per-artist running flags so concurrent artist navigations do not block each other.
 // ======================================================================
 
-let getArtistDetailsRunning;
+const getArtistDetailsRunning = {};
 
 export const getArtistDetails = (libraryId, artistId) => {
   if (!isStoreReady()) return;
-  if (!getArtistDetailsRunning) {
-    const prevArtistDetails = store.getState().appModel.allArtists?.find((artist) => artist.artistId === artistId);
-    if (refetchData || !prevArtistDetails) {
-      console.log('%c--- bridge - getArtistDetails ---', 'color:#f9743b;');
-      getArtistDetailsRunning = true;
-      const accessToken = store.getState().sessionModel.currentServer.accessToken;
-      const currentService = store.getState().appModel.currentService;
-      const serverBaseUrl = store.getState().appModel.serverBaseUrl;
-      const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+  const runningKey = `${libraryId}-${artistId}`;
+  if (getArtistDetailsRunning[runningKey]) return;
 
-      serviceTools[currentService]
-        .getArtistDetails({
-          accessToken,
-          artistId,
-          libraryId,
-          serverBaseUrl,
-          userId,
-        })
-        .then((response) => {
-          // console.log(response);
-          store.dispatch.appModel.storeArtistDetails(response);
-        })
-        .catch((error) => {
-          console.error(error);
-          if (error?.error?.status === 400 || error?.error?.status === 404) {
-            store.dispatch.appModel.storeArtist404({ artistId });
-          }
-          analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Details');
-        })
-        .finally(() => {
-          getArtistDetailsRunning = false;
-        });
-    }
+  const prevArtistDetails = store.getState().appModel.allArtists?.find((artist) => artist.artistId === artistId);
+  if (refetchData || !prevArtistDetails) {
+    console.log('%c--- bridge - getArtistDetails ---', 'color:#f9743b;');
+    getArtistDetailsRunning[runningKey] = true;
+    const accessToken = store.getState().sessionModel.currentServer.accessToken;
+    const currentService = store.getState().appModel.currentService;
+    const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+    const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+
+    serviceTools[currentService]
+      .getArtistDetails({
+        accessToken,
+        artistId,
+        libraryId,
+        serverBaseUrl,
+        userId,
+      })
+      .then((response) => {
+        // console.log(response);
+        store.dispatch.appModel.storeArtistDetails(response);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (error?.error?.status === 400 || error?.error?.status === 404) {
+          store.dispatch.appModel.storeArtist404({ artistId });
+        }
+        analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Details');
+      })
+      .finally(() => {
+        delete getArtistDetailsRunning[runningKey];
+      });
   }
 };
 
@@ -492,125 +494,141 @@ export const getArtistDetails = (libraryId, artistId) => {
 // GET ALBUM ARTIST DETAILS
 // ======================================================================
 
-let getAlbumArtistDetailsRunning;
+const getAlbumArtistDetailsRunning = {};
 
 export const getAlbumArtistDetails = (libraryId, artistId) => {
   if (!isStoreReady()) return;
-  if (!getAlbumArtistDetailsRunning) {
-    const prevAlbumArtistDetails = store
-      .getState()
-      .appModel.allAlbumArtists?.find((artist) => artist.artistId === artistId);
-    if (refetchData || !prevAlbumArtistDetails) {
-      console.log('%c--- bridge - getAlbumArtistDetails ---', 'color:#f9743b;');
-      getAlbumArtistDetailsRunning = true;
-      const accessToken = store.getState().sessionModel.currentServer.accessToken;
-      const currentService = store.getState().appModel.currentService;
-      const serverBaseUrl = store.getState().appModel.serverBaseUrl;
-      const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+  const runningKey = `${libraryId}-${artistId}`;
+  if (getAlbumArtistDetailsRunning[runningKey]) return;
 
-      serviceTools[currentService]
-        .getArtistDetails({
-          accessToken,
-          artistId,
-          libraryId,
-          serverBaseUrl,
-          userId,
-        })
-        .then((response) => {
-          // console.log(response);
-          store.dispatch.appModel.storeAlbumArtistDetails(response);
-        })
-        .catch((error) => {
-          console.error(error);
-          if (error?.error?.status === 400 || error?.error?.status === 404) {
-            store.dispatch.appModel.storeAlbumArtist404({ artistId });
-          }
-          analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Album Artist Details');
-        })
-        .finally(() => {
-          getAlbumArtistDetailsRunning = false;
-        });
-    }
+  const prevAlbumArtistDetails = store
+    .getState()
+    .appModel.allAlbumArtists?.find((artist) => artist.artistId === artistId);
+  if (refetchData || !prevAlbumArtistDetails) {
+    console.log('%c--- bridge - getAlbumArtistDetails ---', 'color:#f9743b;');
+    getAlbumArtistDetailsRunning[runningKey] = true;
+    const accessToken = store.getState().sessionModel.currentServer.accessToken;
+    const currentService = store.getState().appModel.currentService;
+    const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+    const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+
+    serviceTools[currentService]
+      .getArtistDetails({
+        accessToken,
+        artistId,
+        libraryId,
+        serverBaseUrl,
+        userId,
+      })
+      .then((response) => {
+        // console.log(response);
+        store.dispatch.appModel.storeAlbumArtistDetails(response);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (error?.error?.status === 400 || error?.error?.status === 404) {
+          store.dispatch.appModel.storeAlbumArtist404({ artistId });
+        }
+        analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Album Artist Details');
+      })
+      .finally(() => {
+        delete getAlbumArtistDetailsRunning[runningKey];
+      });
   }
 };
 
 // ======================================================================
 // GET ARTIST ALBUMS
+// Returns a Promise so callers (e.g. adjacent-album autoplay) can await data.
 // ======================================================================
 
-let getAllArtistAlbumsRunning;
+const getAllArtistAlbumsRunning = {};
+const getAllArtistAlbumsPromises = {};
 
 export const getAllArtistAlbums = (libraryId, artistId) => {
-  if (!isStoreReady()) return;
-  if (!getAllArtistAlbumsRunning) {
-    const prevAllAlbums = store.getState().appModel.allArtistAlbums[libraryId + '-' + artistId];
-    if (refetchData || !prevAllAlbums) {
-      console.log('%c--- bridge - getAllArtistAlbums ---', 'color:#f9743b;');
-      getAllArtistAlbumsRunning = true;
-      const accessToken = store.getState().sessionModel.currentServer.accessToken;
-      const currentService = store.getState().appModel.currentService;
-      const serverBaseUrl = store.getState().appModel.serverBaseUrl;
-      const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+  if (!isStoreReady()) return Promise.resolve();
 
-      serviceTools[currentService]
-        .getAllArtistAlbums({
-          accessToken,
-          artistId,
-          libraryId,
-          serverBaseUrl,
-          userId,
-        })
-        .then((response) => {
-          // console.log(response);
-          store.dispatch.appModel.storeArtistAlbums({ libraryId, artistId, artistAlbums: response });
-        })
-        .catch((error) => {
-          console.error(error);
-          analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Albums');
-        })
-        .finally(() => {
-          getAllArtistAlbumsRunning = false;
-        });
-    }
+  const runningKey = `${libraryId}-${artistId}`;
+  const prevAllAlbums = store.getState().appModel.allArtistAlbums[runningKey];
+
+  if (!refetchData && prevAllAlbums) {
+    return Promise.resolve(prevAllAlbums);
   }
+
+  if (getAllArtistAlbumsPromises[runningKey]) {
+    return getAllArtistAlbumsPromises[runningKey];
+  }
+
+  console.log('%c--- bridge - getAllArtistAlbums ---', 'color:#f9743b;');
+  getAllArtistAlbumsRunning[runningKey] = true;
+  const accessToken = store.getState().sessionModel.currentServer.accessToken;
+  const currentService = store.getState().appModel.currentService;
+  const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+  const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+
+  getAllArtistAlbumsPromises[runningKey] = serviceTools[currentService]
+    .getAllArtistAlbums({
+      accessToken,
+      artistId,
+      libraryId,
+      serverBaseUrl,
+      userId,
+    })
+    .then((response) => {
+      // console.log(response);
+      store.dispatch.appModel.storeArtistAlbums({ libraryId, artistId, artistAlbums: response });
+      return response;
+    })
+    .catch((error) => {
+      console.error(error);
+      analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Albums');
+      throw error;
+    })
+    .finally(() => {
+      delete getAllArtistAlbumsRunning[runningKey];
+      delete getAllArtistAlbumsPromises[runningKey];
+    });
+
+  return getAllArtistAlbumsPromises[runningKey];
 };
 
 // ======================================================================
 // GET ARTIST RELATED ALBUMS
 // ======================================================================
 
-let getAllArtistRelatedAlbumsRunning;
+const getAllArtistRelatedAlbumsRunning = {};
 
 export const getAllArtistRelatedAlbums = (libraryId, artistId) => {
   if (!isStoreReady()) return;
-  if (!getAllArtistRelatedAlbumsRunning) {
-    const prevAllRelated = store.getState().appModel.allArtistRelatedAlbums[libraryId + '-' + artistId];
-    if (refetchData || !prevAllRelated) {
-      console.log('%c--- bridge - getAllArtistRelatedAlbums ---', 'color:#f9743b;');
-      getAllArtistRelatedAlbumsRunning = true;
-      const accessToken = store.getState().sessionModel.currentServer.accessToken;
-      const currentService = store.getState().appModel.currentService;
-      const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+  const runningKey = `${libraryId}-${artistId}`;
+  if (getAllArtistRelatedAlbumsRunning[runningKey]) return;
 
-      serviceTools[currentService]
-        .getAllArtistRelatedAlbums({
-          accessToken,
-          artistId,
-          libraryId,
-          serverBaseUrl,
-        })
-        .then((response) => {
-          // console.log(response);
-          store.dispatch.appModel.storeArtistRelated({ libraryId, artistId, artistRelated: response });
-        })
-        .catch((error) => {
-          console.error(error);
-          analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Related Albums');
-        })
-        .finally(() => {
-          getAllArtistRelatedAlbumsRunning = false;
-        });
-    }
+  const prevAllRelated = store.getState().appModel.allArtistRelatedAlbums[runningKey];
+  if (refetchData || !prevAllRelated) {
+    console.log('%c--- bridge - getAllArtistRelatedAlbums ---', 'color:#f9743b;');
+    getAllArtistRelatedAlbumsRunning[runningKey] = true;
+    const accessToken = store.getState().sessionModel.currentServer.accessToken;
+    const currentService = store.getState().appModel.currentService;
+    const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+
+    serviceTools[currentService]
+      .getAllArtistRelatedAlbums({
+        accessToken,
+        artistId,
+        libraryId,
+        serverBaseUrl,
+      })
+      .then((response) => {
+        // console.log(response);
+        store.dispatch.appModel.storeArtistRelated({ libraryId, artistId, artistRelated: response });
+      })
+      .catch((error) => {
+        console.error(error);
+        analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Related Albums');
+      })
+      .finally(() => {
+        delete getAllArtistRelatedAlbumsRunning[runningKey];
+      });
   }
 };
 
@@ -618,46 +636,47 @@ export const getAllArtistRelatedAlbums = (libraryId, artistId) => {
 // GET ARTIST APPEARANCE ALBUMS
 // ======================================================================
 
-let getAllArtistAppearanceAlbumsRunning;
+const getAllArtistAppearanceAlbumsRunning = {};
 
 export const getAllArtistAppearanceAlbums = (libraryId, artistId, artistName) => {
   if (!isStoreReady()) return;
-  if (!getAllArtistAppearanceAlbumsRunning) {
-    const prevAllAppearanceAlbums = store.getState().appModel.allArtistAppearanceAlbums[libraryId + '-' + artistId];
-    if (refetchData || !prevAllAppearanceAlbums) {
-      console.log('%c--- bridge - getAllArtistAppearanceAlbums ---', 'color:#f9743b;');
-      getAllArtistAppearanceAlbumsRunning = true;
-      const accessToken = store.getState().sessionModel.currentServer.accessToken;
-      const currentService = store.getState().appModel.currentService;
-      const serverBaseUrl = store.getState().appModel.serverBaseUrl;
-      const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+  const runningKey = `${libraryId}-${artistId}`;
+  if (getAllArtistAppearanceAlbumsRunning[runningKey]) return;
 
-      serviceTools[currentService]
-        .getAllArtistAppearanceAlbums({
-          accessToken,
-          artistId,
-          artistName,
+  const prevAllAppearanceAlbums = store.getState().appModel.allArtistAppearanceAlbums[runningKey];
+  if (refetchData || !prevAllAppearanceAlbums) {
+    console.log('%c--- bridge - getAllArtistAppearanceAlbums ---', 'color:#f9743b;');
+    getAllArtistAppearanceAlbumsRunning[runningKey] = true;
+    const accessToken = store.getState().sessionModel.currentServer.accessToken;
+    const currentService = store.getState().appModel.currentService;
+    const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+    const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+
+    serviceTools[currentService]
+      .getAllArtistAppearanceAlbums({
+        accessToken,
+        artistId,
+        artistName,
+        libraryId,
+        serverBaseUrl,
+        store,
+        userId,
+      })
+      .then((response) => {
+        // console.log(response);
+        store.dispatch.appModel.storeArtistAppearanceAlbums({
           libraryId,
-          serverBaseUrl,
-          store,
-          userId,
-        })
-        .then((response) => {
-          // console.log(response);
-          store.dispatch.appModel.storeArtistAppearanceAlbums({
-            libraryId,
-            artistId,
-            artistAppearanceAlbums: response,
-          });
-        })
-        .catch((error) => {
-          console.error(error);
-          analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Appearance Albums');
-        })
-        .finally(() => {
-          getAllArtistAppearanceAlbumsRunning = false;
+          artistId,
+          artistAppearanceAlbums: response,
         });
-    }
+      })
+      .catch((error) => {
+        console.error(error);
+        analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Appearance Albums');
+      })
+      .finally(() => {
+        delete getAllArtistAppearanceAlbumsRunning[runningKey];
+      });
   }
 };
 
@@ -665,57 +684,58 @@ export const getAllArtistAppearanceAlbums = (libraryId, artistId, artistName) =>
 // GET ARTIST TRACKS
 // ======================================================================
 
-let getAllArtistTracksRunning;
+const getAllArtistTracksRunning = {};
+const getAllArtistTracksPromises = {};
 
 export const getAllArtistTracks = (libraryId, artistId, artistName) => {
-  return new Promise((resolve, reject) => {
-    if (!isStoreReady()) {
-      resolve();
-      return;
-    }
-    if (!getAllArtistTracksRunning) {
-      const prevArtistTracks = store.getState().appModel.allArtistTracks[libraryId + '-' + artistId];
-      if (refetchData || !prevArtistTracks) {
-        console.log('%c--- bridge - getAllArtistTracks ---', 'color:#f9743b;');
-        getAllArtistTracksRunning = true;
-        const accessToken = store.getState().sessionModel.currentServer.accessToken;
-        const currentService = store.getState().appModel.currentService;
-        const serverBaseUrl = store.getState().appModel.serverBaseUrl;
-        const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+  if (!isStoreReady()) return Promise.resolve();
 
-        serviceTools[currentService]
-          .getAllArtistTracks({
-            accessToken,
-            artistId,
-            artistName,
-            libraryId,
-            serverBaseUrl,
-            userId,
-          })
-          .then((response) => {
-            // console.log(response);
-            store.dispatch.appModel.storeArtistTracks({
-              libraryId,
-              artistId,
-              artistTracks: response,
-            });
-            resolve();
-          })
-          .catch((error) => {
-            console.error(error);
-            analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Tracks');
-            reject(error);
-          })
-          .finally(() => {
-            getAllArtistTracksRunning = false;
-          });
-      } else {
-        resolve();
-      }
-    } else {
-      resolve();
-    }
-  });
+  const runningKey = `${libraryId}-${artistId}`;
+  const prevArtistTracks = store.getState().appModel.allArtistTracks[runningKey];
+
+  if (!refetchData && prevArtistTracks) {
+    return Promise.resolve(prevArtistTracks);
+  }
+
+  if (getAllArtistTracksPromises[runningKey]) {
+    return getAllArtistTracksPromises[runningKey];
+  }
+
+  console.log('%c--- bridge - getAllArtistTracks ---', 'color:#f9743b;');
+  getAllArtistTracksRunning[runningKey] = true;
+  const accessToken = store.getState().sessionModel.currentServer.accessToken;
+  const currentService = store.getState().appModel.currentService;
+  const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+  const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+
+  getAllArtistTracksPromises[runningKey] = serviceTools[currentService]
+    .getAllArtistTracks({
+      accessToken,
+      artistId,
+      artistName,
+      libraryId,
+      serverBaseUrl,
+      userId,
+    })
+    .then((response) => {
+      store.dispatch.appModel.storeArtistTracks({
+        libraryId,
+        artistId,
+        artistTracks: response,
+      });
+      return response;
+    })
+    .catch((error) => {
+      console.error(error);
+      analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Artist Tracks');
+      throw error;
+    })
+    .finally(() => {
+      delete getAllArtistTracksRunning[runningKey];
+      delete getAllArtistTracksPromises[runningKey];
+    });
+
+  return getAllArtistTracksPromises[runningKey];
 };
 
 // ======================================================================
@@ -809,52 +829,50 @@ export const getAlbumDetails = (libraryId, albumId, callback) => {
 // GET ALBUM TRACKS
 // ======================================================================
 
-let getAlbumTracksRunning;
+const getAlbumTracksPromises = {};
 
 export const getAlbumTracks = (libraryId, albumId) => {
-  return new Promise((resolve, reject) => {
-    if (!isStoreReady()) {
-      resolve();
-      return;
-    }
-    if (!getAlbumTracksRunning) {
-      const prevAlbumTracks = store.getState().appModel.allAlbumTracks[libraryId + '-' + albumId];
-      if (refetchData || !prevAlbumTracks) {
-        console.log('%c--- bridge - getAlbumTracks ---', 'color:#f9743b;');
-        getAlbumTracksRunning = true;
-        const accessToken = store.getState().sessionModel.currentServer.accessToken;
-        const currentService = store.getState().appModel.currentService;
-        const serverBaseUrl = store.getState().appModel.serverBaseUrl;
-        const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+  if (!isStoreReady()) return Promise.resolve();
 
-        serviceTools[currentService]
-          .getAlbumTracks({
-            accessToken,
-            albumId,
-            libraryId,
-            serverBaseUrl,
-            userId,
-          })
-          .then((response) => {
-            // console.log(response);
-            store.dispatch.appModel.storeAlbumTracks({ libraryId, albumId, albumTracks: response });
-            resolve();
-          })
-          .catch((error) => {
-            console.error(error);
-            analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Album Tracks');
-            reject(error);
-          })
-          .finally(() => {
-            getAlbumTracksRunning = false;
-          });
-      } else {
-        resolve();
-      }
-    } else {
-      resolve();
-    }
-  });
+  const runningKey = `${libraryId}-${albumId}`;
+  const prevAlbumTracks = store.getState().appModel.allAlbumTracks[runningKey];
+
+  if (!refetchData && prevAlbumTracks) {
+    return Promise.resolve(prevAlbumTracks);
+  }
+
+  if (getAlbumTracksPromises[runningKey]) {
+    return getAlbumTracksPromises[runningKey];
+  }
+
+  console.log('%c--- bridge - getAlbumTracks ---', 'color:#f9743b;');
+  const accessToken = store.getState().sessionModel.currentServer.accessToken;
+  const currentService = store.getState().appModel.currentService;
+  const serverBaseUrl = store.getState().appModel.serverBaseUrl;
+  const userId = currentService === 'jellyfin' ? store.getState().appModel.currentAccount.userId : null;
+
+  getAlbumTracksPromises[runningKey] = serviceTools[currentService]
+    .getAlbumTracks({
+      accessToken,
+      albumId,
+      libraryId,
+      serverBaseUrl,
+      userId,
+    })
+    .then((response) => {
+      store.dispatch.appModel.storeAlbumTracks({ libraryId, albumId, albumTracks: response });
+      return response;
+    })
+    .catch((error) => {
+      console.error(error);
+      analyticsEvent(toUpperFirst(currentService) + ' / Error / Get Album Tracks');
+      throw error;
+    })
+    .finally(() => {
+      delete getAlbumTracksPromises[runningKey];
+    });
+
+  return getAlbumTracksPromises[runningKey];
 };
 
 // ======================================================================

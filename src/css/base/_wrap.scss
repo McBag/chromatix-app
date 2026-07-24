@@ -44,11 +44,14 @@
 }
 
 .layout {
+  // Keep controls row height fixed so content area does not jump with track metadata.
+  --control-bar-height: 120px;
+
   display: grid;
   grid-template-areas:
     'sidebar content rightbar'
     'controls controls controls';
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr var(--control-bar-height);
   grid-template-columns: auto 1fr auto;
   height: 100vh;
   height: 100svh;
@@ -92,6 +95,10 @@
 
 .layout-controls {
   grid-area: controls;
+  height: var(--control-bar-height);
+  min-height: var(--control-bar-height);
+  max-height: var(--control-bar-height);
+  overflow: hidden;
   background: var(--color-secondary-bg);
 }
 

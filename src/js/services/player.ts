@@ -164,27 +164,98 @@ export const setVolume = (volumeLevel: number): void => {
 };
 
 // ======================================================================
-// PRELOADING STUBS
-// [NOTE] Not currently used, but may be in future
+// TESLA / BACKGROUND PLAYBACK HELPERS
+// Native player owns keep-alive; re-export so callers use player.ts only.
 // ======================================================================
 
-// // Listen to track progress and preload the next track when we're within 45 seconds
-// // of the end, or at 60% progress, whichever comes first
-// export const updateProgress = (_currentProgress: number): void => {
-//   return;
-// };
+export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
+  if (activePlayer === 'dash') return null;
+  return nativeX.getCurrentPlayerElement();
+};
 
-// export const preloadNextTrack = (_trackSrc: string): void => {
-//   return;
-// };
+export const setAdvanceLatchKey = (key: string): void => {
+  nativeX.setAdvanceLatchKey(key);
+};
 
-// export const setNextTrack = (_track: PlayerTrack | null): void => {
-//   return;
-// };
+export const resetTrackAdvanceLatch = (): void => {
+  nativeX.resetTrackAdvanceLatch();
+};
 
-// export const clearNextTrack = (): void => {
-//   return;
-// };
+export const setTrackEndedCallback = (handler: (() => void) | null): void => {
+  nativeX.setTrackEndedCallback(handler);
+};
+
+export const requestTrackAdvance = (): void => {
+  nativeX.requestTrackAdvance();
+};
+
+export const clearManualPauseFlag = (): void => {
+  nativeX.clearManualPauseFlag();
+};
+
+export const isManualPause = (): boolean => nativeX.isManualPause();
+
+export const isPlaybackExpected = (): boolean => {
+  if (activePlayer === 'dash') return true;
+  return nativeX.isPlaybackExpected();
+};
+
+export const ensureActivePlayback = (): void => {
+  if (activePlayer === 'native') nativeX.ensureActivePlayback();
+};
+
+export const ensureAudioKeepAlive = (): void => {
+  if (activePlayer === 'native') nativeX.ensureAudioKeepAlive();
+};
+
+export const stopAudioKeepAlive = (): void => {
+  nativeX.stopAudioKeepAlive();
+};
+
+export const ensureHiddenLoadRecovery = (): void => {
+  if (activePlayer === 'native') nativeX.ensureHiddenLoadRecovery();
+};
+
+export const isHiddenLoadRecoveryActive = (): boolean => {
+  if (activePlayer === 'dash') return false;
+  return nativeX.isHiddenLoadRecoveryActive();
+};
+
+export const syncHiddenMediaSession = (positionSec?: number, durationSec?: number): void => {
+  if (activePlayer === 'native') nativeX.syncHiddenMediaSession(positionSec, durationSec);
+};
+
+export const runBackgroundPlaybackTick = (): void => {
+  if (activePlayer === 'native') nativeX.runBackgroundPlaybackTick();
+};
+
+export const nudgeActivePlayback = (): void => {
+  if (activePlayer === 'native') nativeX.nudgeActivePlayback();
+};
+
+export const isActivePlaybackAudible = (): boolean => {
+  if (activePlayer === 'dash') return true;
+  return nativeX.isActivePlaybackAudible();
+};
+
+export const getPlaybackProgressMs = (): number => {
+  if (activePlayer === 'dash') return dashX.getCurrentProgress() * 1000;
+  return nativeX.getPlaybackProgressMs();
+};
+
+export const getCurrentDuration = (): number => {
+  if (activePlayer === 'dash') return 0;
+  return nativeX.getCurrentDuration();
+};
+
+export const handleBecameHidden = (): void => {
+  if (activePlayer === 'native') nativeX.handleBecameHidden();
+};
+
+// ======================================================================
+// PRELOADING STUBS
+// [NOTE] Intentionally unused — Tesla build uses a single active audio element.
+// ======================================================================
 
 // ======================================================================
 // DEBUGGING - BROWSER CONSOLE ACCESS

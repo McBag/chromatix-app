@@ -10,6 +10,15 @@ export class MockHTMLAudioElement {
   paused = true;
 
   private eventListeners: { [key: string]: Function[] } = {};
+  private attributes: { [key: string]: string } = {};
+
+  setAttribute(name: string, value: string) {
+    this.attributes[name] = value;
+  }
+
+  getAttribute(name: string) {
+    return this.attributes[name] ?? null;
+  }
 
   addEventListener(event: string, listener: Function, options?: any) {
     if (!this.eventListeners[event]) {

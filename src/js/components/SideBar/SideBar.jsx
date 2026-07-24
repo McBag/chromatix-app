@@ -168,6 +168,36 @@ const SideBar = () => {
                     Albums
                   </NavLink>
                 )}
+                {menuShowAlbums && platformOpts.menuAlbums && (
+                  <NavLink
+                    className={style.link}
+                    activeClassName={style.linkActive}
+                    to={`/libraries/${currentLibraryId}/recently-added`}
+                    draggable="false"
+                  >
+                    {menuShowIcons && (
+                      <span className={style.icon}>
+                        <Icon icon="ClockRewindIcon" cover stroke />
+                      </span>
+                    )}
+                    Recently Added
+                  </NavLink>
+                )}
+                {menuShowAlbums && platformOpts.menuAlbums && (
+                  <NavLink
+                    className={style.link}
+                    activeClassName={style.linkActive}
+                    to={`/libraries/${currentLibraryId}/random-albums`}
+                    draggable="false"
+                  >
+                    {menuShowIcons && (
+                      <span className={style.icon}>
+                        <Icon icon="DiscIcon" cover stroke />
+                      </span>
+                    )}
+                    Random Albums
+                  </NavLink>
+                )}
                 {menuShowFolders && platformOpts.menuFolders && (
                   <NavLink
                     className={style.link}

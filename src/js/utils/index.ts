@@ -17,4 +17,5 @@ export { default as safeDecodeURIComponent } from './safeDecodeURIComponent';
 export { default as safeEncodeURIComponent } from './safeEncodeURIComponent';
 export { default as sendToElectron } from './sendToElectron';
 export { default as setLocalStorage } from './setLocalStorage';
-export { default as sortList } from './sortList';
+export { default as sortList, getAlphabetLetter, findAlphabetEntryIndex } from './sortList';
+export { teslaSetMetadataFromTrack, formatMediaSessionTitle } from './teslaArtworkFix';

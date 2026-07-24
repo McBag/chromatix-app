@@ -56,6 +56,16 @@ const sessionState = {
   switchToTrackViewOnArtistPlay: false,
   disableRepeatOnceOnTrackChange: true,
   disableRepeatOnceOnSourceChange: true,
+
+  // After an album ends, continue with another album by the same artist.
+  autoPlayPreviousAlbumOnAlbumEnd: true,
+  // When true: next album by release year (newer). When false: previous (older).
+  autoPlayNextAlbumByReleaseYear: false,
+  _adjacentAlbumLoading: false,
+  _adjacentAlbumPrefetched: false,
+  _lastQueuedAlbumId: null,
+  // User-initiated pause — keep-alive must not auto-resume while this is true.
+  _manualPause: false,
   revertRepeatOnceToRepeatAll: true,
 
   optionLogPlaybackToServer: true,
@@ -89,7 +99,7 @@ const sessionState = {
 
   // MENU / SIDEBAR OPTIONS
 
-  menuShowBanners: true,
+  menuShowBanners: false,
 
   menuShowSearch: true,
   menuShowIcons: true,
@@ -123,6 +133,7 @@ const sessionState = {
 
   controlBarTitle: true,
   controlBarArtist: true,
+  controlBarAlbum: true,
   controlBarIsFavourite: true,
   controlBarUserRating: true,
 
@@ -215,7 +226,7 @@ const sessionState = {
   // VIEW ORDERING OPTIONS
 
   orderArtists: 'asc',
-  orderArtistAlbums: 'asc',
+  orderArtistAlbums: 'desc',
   orderArtistTracks: 'asc',
   orderAlbums: 'asc',
   orderFolders: 'asc',

@@ -95,6 +95,16 @@ export const authRoutes = [
     exact: true,
     component: 'AlbumDetail',
   },
+  {
+    path: '/libraries/:libraryId/recently-added',
+    exact: true,
+    component: 'RecentlyAdded',
+  },
+  {
+    path: '/libraries/:libraryId/random-albums',
+    exact: true,
+    component: 'RandomAlbums',
+  },
 
   // folders
   {

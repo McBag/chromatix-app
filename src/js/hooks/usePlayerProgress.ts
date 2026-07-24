@@ -83,13 +83,9 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
       setTrackProgress(newTrackProgress);
 
       if (updateStore) {
-        // // Call the player.native updateProgress function for preloading
-        // // [NOTE] Not currently used, but may be in future
-        // playerX.updateProgress(newTrackProgress);
-
-        // Only update redux every 5 seconds
+        // Only update redux every 30 seconds to avoid triggering store persistence
         counterRef.current += 1;
-        if (counterRef.current === 5) {
+        if (counterRef.current === 30) {
           dispatch.playerModel.playerProgress(newTrackProgress);
           counterRef.current = 0;
         }
@@ -97,13 +93,34 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
     }
   }, [dispatch, updateStore]);
 
-  // Whilst track is playing, update track progress every second
+  // Whilst track is playing, update track progress (faster when tab is hidden)
   useEffect(() => {
     if (playerInited) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      intervalRef.current = setInterval(updateTrackProgress, 1000);
+
+      const getIntervalMs = () => {
+        if (document.hidden) return 250;
+        return 1000;
+      };
+
+      intervalRef.current = setInterval(updateTrackProgress, getIntervalMs());
+
+      const handleVisibility = () => {
+        if (!playerInited || !intervalRef.current) return;
+        clearInterval(intervalRef.current);
+        intervalRef.current = setInterval(updateTrackProgress, getIntervalMs());
+      };
+
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibility);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
     }
     return () => {
       if (intervalRef.current) {
@@ -133,3 +150,4 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
 };
 
 export default usePlayerProgress;
+

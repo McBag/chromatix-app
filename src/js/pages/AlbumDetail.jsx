@@ -57,6 +57,10 @@ const AlbumDetail = () => {
     });
   };
 
+  const doQueue = () => {
+    dispatch.playerModel.addAlbumToQueue({ albumId });
+  };
+
   if (!albumInfo) {
     return <Loading forceVisible inline showOffline />;
   }
@@ -90,6 +94,7 @@ const AlbumDetail = () => {
           albumTracks={albumTracks}
           colOptions={colOptions}
           doPlay={doPlay}
+          doQueue={doQueue}
           isListView={isListView}
           isLoaded={isLoaded}
           isPlaying={isPlaying}
@@ -124,6 +129,7 @@ const AlbumDetail = () => {
             albumTracks={albumTracks}
             colOptions={colOptions}
             doPlay={doPlay}
+            doQueue={doQueue}
             isListView={isListView}
             isLoaded={isLoaded}
             isPlaying={isPlaying}
@@ -152,6 +158,7 @@ const Title = ({
   albumTracks,
   colOptions,
   doPlay,
+  doQueue,
   isListView,
   isLoaded,
   isPlaying,
@@ -287,9 +294,11 @@ const Title = ({
         </div>
       }
       showPlay={true}
+      showQueue={Boolean(albumTracks?.length)}
       isLoaded={isLoaded}
       isPlaying={isPlaying}
       handlePlay={albumTracks && albumTracks.length > 0 ? doPlay : null}
+      handleQueue={albumTracks?.length ? doQueue : null}
     />
   );
 };

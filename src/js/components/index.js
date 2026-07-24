@@ -1,3 +1,4 @@
+export { default as AlphabetNav } from './AlphabetNav/AlphabetNav';
 export { default as Blocker } from './Blocker/Blocker';
 export { default as Button } from './Button/Button';
 export { default as ContextMenu } from './ContextMenu/ContextMenu';

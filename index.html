@@ -3,21 +3,18 @@
 <head>
   <meta charset="utf-8">
 
-
-
   <!-- TITLE -->
   <title>Chromatix</title>
 
   <!-- VIEWPORT -->
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 
-  <!-- FAVICONS -->
-  <link rel="icon" href="/icon/favicon.ico" sizes="any">
-  <link rel="icon" href="/icon/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icon/icon-180.png">
+  <!-- FAVICONS (relative for Tesla static hosting) -->
+  <link rel="icon" href="./icon/favicon.ico" sizes="any">
+  <link rel="icon" href="./icon/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon/icon-180.png">
 
-  <!-- MANIFEST -->
-  <link rel="manifest" href="/manifest.json">
+  <!-- MANIFEST intentionally omitted for Tesla static hosting -->
 
   <!-- INITIAL CSS -->
   <style id="style-initial">
@@ -33,27 +30,36 @@
         color:#fff;
       }
     }
-  </style>
-
-  <!-- UMAMI ANALYTICS -->
-  <!-- <script>
-    // Only load analytics in production environments
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      const analyticsScript = document.createElement('script');
-      analyticsScript.defer = true;
-      analyticsScript.src = 'https://cloud.umami.is/script.js';
-      analyticsScript.dataset.websiteId = '834ea43e-7c58-4ea7-9a76-47738f7529ad';
-      document.head.appendChild(analyticsScript);
+    .app-boot-loader{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      font:16px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      text-align:center;
     }
-  </script> -->
-
-
+    .app-boot-loader:after{
+      width:32px;
+      height:32px;
+      border:3px solid currentColor;
+      border-top-color:transparent;
+      border-radius:50%;
+      animation:chromatix-boot-spin 1s linear infinite;
+      content:"";
+    }
+    @keyframes chromatix-boot-spin {
+      to{
+        transform:rotate(360deg);
+      }
+    }
+  </style>
 
 </head>
 <body>
 
-
-
+  <div id="app-boot-loader" class="app-boot-loader" aria-live="polite"></div>
   <div id="root"></div>
 
   <script type="module" src="/src/index.tsx"></script>
