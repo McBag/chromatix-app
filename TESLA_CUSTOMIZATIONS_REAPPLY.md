@@ -20,14 +20,14 @@ This document describes all Tesla customizations applied on top of stock Chromat
 
 ## What changed vs. older guides
 
-| Topic | 0.59.0 Cursor (CRA) | 0.66.0 this tree (Vite) |
-| ----- | ------------------- | ----------------------- |
-| Bundler | Create React App | Vite 8 |
-| Env vars | `REACT_APP_*` / `process.env` | `VITE_*` / `import.meta.env` |
-| Build | `npm run build:win` → CRA `static/` | `npm run build:win` → Vite + **finalize to CRA layout** |
-| Output | `build/static/js/main.*.js` | Same layout after finalize: `static/js|css|media` |
-| Player router | Native only in Cursor fork | `player.ts` routes native + DASH; Tesla keep-alive on **native** |
-| Settings home | `SettingsGeneral` playback block | `SettingsPlayback` (0.66 split) |
+| Topic         | 0.59.0 Cursor (CRA)                 | 0.66.0 this tree (Vite)                                          |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------- | --- | ------ |
+| Bundler       | Create React App                    | Vite 8                                                           |
+| Env vars      | `REACT_APP_*` / `process.env`       | `VITE_*` / `import.meta.env`                                     |
+| Build         | `npm run build:win` → CRA `static/` | `npm run build:win` → Vite + **finalize to CRA layout**          |
+| Output        | `build/static/js/main.*.js`         | Same layout after finalize: `static/js                           | css | media` |
+| Player router | Native only in Cursor fork          | `player.ts` routes native + DASH; Tesla keep-alive on **native** |
+| Settings home | `SettingsGeneral` playback block    | `SettingsPlayback` (0.66 split)                                  |
 
 ---
 
@@ -52,13 +52,13 @@ build/
 
 ### Files
 
-| File | Role |
-| ---- | ---- |
-| `package.json` | `"homepage": "."`, script `"build:win": "node lib/build-win.mjs"` |
-| `vite.config.ts` | `base: './'`; emit into `static/js`, `static/css`, `static/media` |
-| `lib/build-win.mjs` | Sets `VITE_VERSION` / `VITE_DATE`, runs `vite build`, then finalize |
-| `lib/finalize-cra-layout.mjs` | Ensures CRA folder layout, relative paths, writes `asset-manifest.json` |
-| `index.html` | Boot spinner (`#app-boot-loader`), relative `./icon/…`, **no** manifest link (Tesla) |
+| File                          | Role                                                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `package.json`                | `"homepage": "."`, script `"build:win": "node lib/build-win.mjs"`                             |
+| `vite.config.ts`              | `base: './'`; emit into `static/js`, `static/css`, `static/media`                             |
+| `lib/build-win.mjs`           | Sets `VITE_VERSION` / `VITE_DATE`, runs `vite build`, then finalize                           |
+| `lib/finalize-cra-layout.mjs` | Ensures CRA folder layout, relative paths, writes `asset-manifest.json`                       |
+| `index.html`                  | Boot spinner (`#app-boot-loader`), relative `./icon/…`, **no** manifest link (Tesla) |
 
 ### Build
 
@@ -85,26 +85,26 @@ npx serve -s build -l 4173
 
 ## Background playback vs. stream cleanup (Tesla)
 
-| Event / state | Playback | Audio unload (`playerUnload` / `src` cleared) |
-| ------------- | -------- | --------------------------------------------- |
-| Tab minimized / `document.hidden` | **Continues** + auto-next track | **No** |
-| `pagehide` / `freeze` while hidden | **Continues** (poll + nudge) | **No** |
-| User Pause | Stays paused (no auto-resume) | **No** |
-| Tab close / navigate away | Stops | **Yes** (`beforeunload` → `playerX.unload()`) |
+| Event / state                      | Playback                        | Audio unload (`playerUnload` / `src` cleared) |
+| ---------------------------------- | ------------------------------- | --------------------------------------------- |
+| Tab minimized / `document.hidden`  | **Continues** + auto-next track | **No**                                        |
+| `pagehide` / `freeze` while hidden | **Continues** (poll + nudge)    | **No**                                        |
+| User Pause                         | Stays paused (no auto-resume)   | **No**                                        |
+| Tab close / navigate away          | Stops                           | **Yes** (`beforeunload` → `playerX.unload()`) |
 
 ### Files
 
-| File | Changes |
-| ---- | ------- |
-| `src/js/services/player.native.ts` | Single attached `<audio>`, track-end polling, `requestTrackAdvance` guard, hidden stall recovery, Web Audio keep-alive oscillator, MediaSession `playbackState` / `setPositionState` helpers |
-| `src/js/services/player.ts` | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native |
-| `src/js/store/models.player.js` | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload |
-| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; 500 ms visible / 100 ms hidden poll; Worker timer when hidden; wall-clock end fallback; **no** pause/unload on hide |
-| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll) |
-| `src/js/hooks/useMediaControls.ts` | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize) |
-| `src/js/hooks/usePlayerProgress.ts` | 250 ms progress interval when tab hidden |
-| `src/js/hooks/useMediaMeta.ts` | Uses `teslaSetMetadataFromTrack` |
-| `src/js/app/App.jsx` | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited` |
+| File                                   | Changes                                                                                                                                                                                      |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/js/services/player.native.ts`     | Single attached `<audio>`, track-end polling, `requestTrackAdvance` guard, hidden stall recovery, Web Audio keep-alive oscillator, MediaSession `playbackState` / `setPositionState` helpers |
+| `src/js/services/player.ts`            | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native                        |
+| `src/js/store/models.player.js`        | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload                   |
+| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; 500 ms visible / 100 ms hidden poll; Worker timer when hidden; wall-clock end fallback; **no** pause/unload on hide                                                               |
+| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                      |
+| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                             |
+| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden                                                                                                                                                     |
+| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                             |
+| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                 |
 
 ### Behavior notes
 
@@ -131,14 +131,14 @@ _manualPause: false,
 
 ### Tesla reliability (why PC worked but car did not)
 
-| Issue | Fix |
-| ----- | --- |
-| Prefetch only on last 2 tracks + single `setTimeout(0)` | Prefetch from remaining ≤4, multi-delay schedule, keep-alive kicks |
-| Fallback to **all library albums** when discography missing | Same-artist only; never unfiltered library list |
-| Failed prefetch marked “done forever” | Leave `_adjacentAlbumPrefetched` false so retries continue |
-| Album-end gap drops media focus | Hold MediaSession + audio keep-alive; long retry loops |
-| `playerLoadAdjacentAlbum` one-shot network | Retries with backoff; full `playerLoadAlbum` last resort |
-| Keep-alive never kicked prefetch | `usePlaybackKeepAlive` prefetches near album/queue end |
+| Issue                                                       | Fix                                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------ |
+| Prefetch only on last 2 tracks + single `setTimeout(0)`     | Prefetch from remaining ≤4, multi-delay schedule, keep-alive kicks |
+| Fallback to **all library albums** when discography missing | Same-artist only; never unfiltered library list                    |
+| Failed prefetch marked “done forever”                       | Leave `_adjacentAlbumPrefetched` false so retries continue         |
+| Album-end gap drops media focus                             | Hold MediaSession + audio keep-alive; long retry loops             |
+| `playerLoadAdjacentAlbum` one-shot network                  | Retries with backoff; full `playerLoadAlbum` last resort           |
+| Keep-alive never kicked prefetch                            | `usePlaybackKeepAlive` prefetches near album/queue end             |
 
 Also Tesla-oriented defaults:
 
@@ -167,9 +167,9 @@ controlBarAlbum: true,
 
 1. Sort artist albums **always ascending by release year** (`releaseDate` / `year`), then title.
 2. Coerce album IDs with `String(...)` (Plex/Jellyfin mix string/number).
-3. `step = autoPlayNextAlbumByReleaseYear ? +1 : -1`  
-   - `false` (default): **previous / older** album  
-   - `true`: **next / newer** album  
+3. `step = autoPlayNextAlbumByReleaseYear ? +1 : -1`
+   - `false` (default): **previous / older** album
+   - `true`: **next / newer** album
 4. Resolve artist via `track.artistId`, `artistLink`, album library row, or session.
 5. `prefetchAdjacentAlbum` loads the adjacent album **into the queue** while the current one plays.
 6. On album end, `playerLoadAdjacentAlbum` queues (if needed) then `playerNext` — Queue UI shows the tracks.
@@ -192,10 +192,10 @@ controlBarAlbum: true,
 
 ### Tesla player lines
 
-| Line | Field | Value |
-| ---- | ----- | ----- |
-| 1 | `title` | `Artist - Title` (`formatMediaSessionTitle`) |
-| 2 | (car UI) | Stream hostname — not overridden |
+| Line | Field    | Value                                        |
+| ---- | -------- | -------------------------------------------- |
+| 1    | `title`  | `Artist - Title` (`formatMediaSessionTitle`) |
+| 2    | (car UI) | Stream hostname — not overridden             |
 
 Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is.
 
@@ -212,11 +212,11 @@ Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackLi
 
 ### Layout
 
-| Section | Content |
-| ------- | ------- |
-| Left | Shuffle / prev / play-pause / next / repeat + scrubber |
-| Center | Cover, title, artist, **album** (if enabled), favourite, rating |
-| Right | Full page, queue, volume |
+| Section | Content                                                         |
+| ------- | --------------------------------------------------------------- |
+| Left    | Shuffle / prev / play-pause / next / repeat + scrubber          |
+| Center  | Cover, title, artist, **album** (if enabled), favourite, rating |
+| Right   | Full page, queue, volume                                        |
 
 ### Sizing (default)
 
@@ -268,12 +268,17 @@ Hooks: `useMediaControls` + `useKeyMediaControls` + `useMediaMeta`.
 
 ## Custom library pages
 
-| Route | Page | Sidebar |
-| ----- | ---- | ------- |
+| Route                                  | Page                                           | Sidebar          |
+| -------------------------------------- | ---------------------------------------------- | ---------------- |
 | `/libraries/:libraryId/recently-added` | `RecentlyAdded.jsx` (albums by `addedAt` desc) | ClockRewind icon |
-| `/libraries/:libraryId/random-albums` | `RandomAlbums.jsx` (shuffled grid) | Disc icon |
+| `/libraries/:libraryId/random-albums`  | `RandomAlbums.jsx` (shuffled grid)             | Disc icon        |
 
 Files: `src/js/_config/routes.ts`, `src/js/components/SideBar/SideBar.jsx`, `src/js/components/index.js` (exports `AlphabetNav`).
+
+### Sidebar UX (Tesla touch)
+
+- **Library** section is always expanded (no collapse toggle / chevron).
+- Larger history arrows (`.nav` / `.prev` / `.next`) and search field (16px text, ~46px height) in `SideBar.module.scss`.
 
 ---
 
@@ -287,17 +292,17 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 
 ## New / heavily forked source files (checklist)
 
-| Path | Purpose |
-| ---- | ------- |
-| `src/js/utils/teslaArtworkFix.ts` | MediaSession title + artwork helper |
-| `src/js/hooks/usePlaybackKeepAlive.ts` | Background multi-song keep-alive |
-| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position poll |
-| `src/js/hooks/useMediaControls.ts` | MediaSession actions (ignore hidden pause) |
-| `src/js/components/AlphabetNav/*` | Letter jump bar |
-| `src/js/pages/RecentlyAdded.jsx` | Sidebar page |
-| `src/js/pages/RandomAlbums.jsx` | Sidebar page |
-| `lib/build-win.mjs` | Windows Vite build |
-| `lib/finalize-cra-layout.mjs` | CRA deploy layout for Tesla static hosting |
+| Path                                   | Purpose                                    |
+| -------------------------------------- | ------------------------------------------ |
+| `src/js/utils/teslaArtworkFix.ts`      | MediaSession title + artwork helper        |
+| `src/js/hooks/usePlaybackKeepAlive.ts` | Background multi-song keep-alive           |
+| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position poll                 |
+| `src/js/hooks/useMediaControls.ts`     | MediaSession actions (ignore hidden pause) |
+| `src/js/components/AlphabetNav/*`      | Letter jump bar                            |
+| `src/js/pages/RecentlyAdded.jsx`       | Sidebar page                               |
+| `src/js/pages/RandomAlbums.jsx`        | Sidebar page                               |
+| `lib/build-win.mjs`                    | Windows Vite build                         |
+| `lib/finalize-cra-layout.mjs`          | CRA deploy layout for Tesla static hosting             |
 
 ### Patched stock files (high level)
 

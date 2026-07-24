@@ -106,6 +106,9 @@ describe('Player Service', () => {
 
     test('registers loadstart, canplay, ended, and error listeners', () => {
       defaultInit();
+      // Tesla player advances via setTrackEndedCallback, not init onEnded.
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+
       (elementA() as any).mockTriggerEvent('loadstart');
       expect(mockCallbacks.onLoadStart).toHaveBeenCalledTimes(1);
 
@@ -298,6 +301,7 @@ describe('Player Service', () => {
     });
 
     test('onEnded fires when the active element emits ended', () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
       player.loadTrack('http://example.com/track1.mp3');
       (elementA() as any).mockTriggerEvent('ended');
       expect(mockCallbacks.onEnded).toHaveBeenCalledTimes(1);
@@ -305,8 +309,6 @@ describe('Player Service', () => {
 
     test('onError fires with the correct playerElement when the active element errors', () => {
       player.loadTrack('http://example.com/track1.mp3');
-      // loadstart must fire first — it clears isResetting so subsequent errors
-      // are treated as genuine playback errors.
       (elementA() as any).mockTriggerEvent('loadstart');
       (elementA() as any).mockTriggerError({});
       expect(mockCallbacks.onError).toHaveBeenCalledTimes(1);
@@ -315,26 +317,26 @@ describe('Player Service', () => {
       expect(callArg).toHaveProperty('playerElement');
     });
 
-    test('onError is suppressed when isResetting (error fires before loadstart)', () => {
+    // Tesla player routes all media errors to onError (no isResetting / empty-src filter).
+    // Abort/stale errors are ignored higher up in models.player instead.
+    test('onError fires even when error arrives before loadstart', () => {
       player.loadTrack('http://example.com/track1.mp3');
-      // isResetting=true until loadstart fires — error should be swallowed.
       (elementA() as any).mockTriggerError({});
-      expect(mockCallbacks.onError).not.toHaveBeenCalled();
+      expect(mockCallbacks.onError).toHaveBeenCalledTimes(1);
     });
 
-    test('onError is suppressed for MEDIA_ERR_SRC_NOT_SUPPORTED with empty src', () => {
+    test('onError fires for MEDIA_ERR_SRC_NOT_SUPPORTED with empty src', () => {
       player.loadTrack('http://example.com/track1.mp3');
-      (elementA() as any).mockTriggerEvent('loadstart'); // clear isResetting
-      // Simulate the empty-src artifact that fires when src is cleared.
+      (elementA() as any).mockTriggerEvent('loadstart');
       (elementA() as any).src = '';
       (elementA() as any).error = { code: 4 };
       (elementA() as any).mockTriggerError({});
-      expect(mockCallbacks.onError).not.toHaveBeenCalled();
+      expect(mockCallbacks.onError).toHaveBeenCalledTimes(1);
     });
 
     test('onError fires for MEDIA_ERR_SRC_NOT_SUPPORTED when src is not empty', () => {
       player.loadTrack('http://example.com/track1.mp3');
-      (elementA() as any).mockTriggerEvent('loadstart'); // clear isResetting
+      (elementA() as any).mockTriggerEvent('loadstart');
       // code=4 with a real src is a genuine unsupported-format error.
       (elementA() as any).error = { code: 4 };
       (elementA() as any).mockTriggerError({});

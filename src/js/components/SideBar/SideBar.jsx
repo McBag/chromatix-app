@@ -37,7 +37,7 @@ const SideBar = () => {
   const menuShowAddPlaylist = useSelector(({ sessionModel }) => sessionModel.menuShowAddPlaylist);
   const menuShowSeparateBrowseSection = useSelector(({ sessionModel }) => sessionModel.menuShowSeparateBrowseSection);
 
-  const menuOpenLibrary = useSelector(({ sessionModel }) => sessionModel.menuOpenLibrary);
+  // Library section is always expanded (Tesla: no collapse — easier touch nav).
   const menuOpenBrowse = useSelector(({ sessionModel }) => sessionModel.menuOpenBrowse);
   const menuOpenPlaylists = useSelector(({ sessionModel }) => sessionModel.menuOpenPlaylists);
 
@@ -57,7 +57,8 @@ const SideBar = () => {
   const menuShowArtistTags = useSelector(({ sessionModel }) => sessionModel.menuShowArtistTags);
   const menuShowAlbumTags = useSelector(({ sessionModel }) => sessionModel.menuShowAlbumTags);
 
-  const browseIsOpen = menuShowSeparateBrowseSection ? menuOpenBrowse : menuOpenLibrary;
+  // When Browse is not a separate section, its items sit under Library and stay visible.
+  const browseIsOpen = menuShowSeparateBrowseSection ? menuOpenBrowse : true;
 
   const platformOpts = platformFeatures[currentService] || {};
 
@@ -105,23 +106,8 @@ const SideBar = () => {
 
         {(libraryIsVisible || (browseIsVisible && !menuShowSeparateBrowseSection)) && (
           <>
-            <button
-              type="button"
-              className={style.label}
-              onClick={() => {
-                dispatch.sessionModel.setSessionState({ menuOpenLibrary: !menuOpenLibrary });
-              }}
-            >
-              Library
-              <span className={style.labelIcon}>
-                {menuOpenLibrary ? (
-                  <Icon icon="ArrowDownIcon" cover stroke strokeWidth={1.4} />
-                ) : (
-                  <Icon icon="ArrowRightIcon" cover stroke strokeWidth={1.4} />
-                )}
-              </span>
-            </button>
-            {libraryIsVisible && menuOpenLibrary && (
+            <div className={style.labelStatic}>Library</div>
+            {libraryIsVisible && (
               <>
                 {menuShowArtists && platformOpts.menuArtists && (
                   <NavLink
