@@ -1,11 +1,13 @@
-# Chromatix Tesla Customizations — Version 0.66.0 (Vite)
+# Chromatix Tesla Customizations — Version 0.67.0 (Vite)
 
-**Base version:** Chromatix `0.66.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.66.0`  
-**Last updated:** 2026-07-19  
-**Build system:** Vite 8 + Rolldown (upstream 0.66.0) — **not** CRA  
-**Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)
+**Base version:** Chromatix `0.67.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.67.0`  
+**Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0`  
+**Last updated:** 2026-07-24  
+**Build system:** Vite 8 + Rolldown (upstream) — **not** CRA  
+**Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)  
+**Routine upgrades:** see **`UPSTREAM_SYNC.md`** (git merge workflow)
 
-This document describes all Tesla customizations applied on top of stock Chromatix 0.66.0. Use it to re-apply changes after upgrading to a new upstream tag.
+This document describes all Tesla customizations applied on top of stock Chromatix. Prefer git merge (`UPSTREAM_SYNC.md`) over full re-apply; use this file when conflicts need intent.
 
 **Fork philosophy:** This tree is a Tesla-optimized Chromatix build. All former Tesla-only behavior (playback keep-alive, MediaSession sync, touch sizing, card controls) is the **default everywhere** — there is **no** `navigator.userAgent` Tesla detection and **no** `html[data-is-tesla]` attribute at runtime. **No next-track preload** — a single active audio path is preferred (native player keep-alive; DASH still routed via `player.ts` when needed).
 
@@ -277,14 +279,9 @@ Files: `src/js/_config/routes.ts`, `src/js/components/SideBar/SideBar.jsx`, `src
 
 ## Bridge artist API concurrency
 
-`src/js/services/bridge.js` — six artist-scoped APIs use **per-key maps** instead of a single boolean:
+As of upstream **0.67.0**, stock `bridge.js` already uses **`runFetch` / `getRunningFetch`** (shared in-flight Promises per key). That supersedes the older Tesla per-key boolean maps.
 
-- `getArtistDetails`, `getAlbumArtistDetails`
-- `getAllArtistAlbums` (Promise + cache)
-- `getAllArtistRelatedAlbums`, `getAllArtistAppearanceAlbums`
-- `getAllArtistTracks` (Promise + cache)
-
-Key format: `` `${libraryId}-${artistId}` ``.
+On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store code that `await`s bridge calls (it re-reads Redux after the promise settles).
 
 ---
 
@@ -318,6 +315,10 @@ Key format: `` `${libraryId}-${artistId}` ``.
 ---
 
 ## Reapply workflow (after a new upstream tag)
+
+**Preferred:** `git fetch upstream --tags` → `git merge <tag>` → resolve → `npm.cmd run build:win` (details in `UPSTREAM_SYNC.md`).
+
+**Fallback** (only if history is unusable):
 
 1. Download the new tag from GitHub into a clean folder.
 2. Keep a copy of this `TESLA_CUSTOMIZATIONS_REAPPLY.md`.

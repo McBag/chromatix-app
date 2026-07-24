@@ -431,7 +431,7 @@ const SideBar = () => {
             </button>
             {menuOpenPlaylists && (
               <>
-                {menuShowAddPlaylist && platformOpts.playlistManagement && (
+                {menuShowAddPlaylist && (
                   <button
                     type="button"
                     className={style.link}

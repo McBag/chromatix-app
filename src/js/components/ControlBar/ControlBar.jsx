@@ -7,7 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 
-import { Favourite, Icon, PopoverMenu, RangeSlider, StarRating } from 'js/components';
+import { Favourite, Icon, PopoverMenu, RangeSlider, StarRating, ContextMenuTracks } from 'js/components';
 import { useKeyPlaybackControls, useKeyMediaControls, useMediaControls, useMediaMeta, usePlayerProgress } from 'js/hooks';
 import { analyticsEvent, durationToStringShort } from 'js/utils';
 import platformFeatures from 'js/_config/platformFeatures';
@@ -57,7 +57,9 @@ const NowPlaying = () => {
   const trackCurrent = playingTrackList?.[playingTrackKeys[playingTrackIndex]];
 
   return (
-    <div className={style.nowPlaying}>
+    <div className={style.nowPlayingOuter}>
+      <ContextMenuTracks track={trackCurrent}>
+        <div className={style.nowPlayingInner}>
       <div className={clsx(style.coverWrap, { [style.coverPlaceholder]: !trackCurrent || !trackCurrent?.thumbSm })}>
         {trackCurrent && (
           <>
@@ -149,6 +151,8 @@ const NowPlaying = () => {
           </div>
         ) : null}
       </div>
+        </div>
+      </ContextMenuTracks>
     </div>
   );
 };
