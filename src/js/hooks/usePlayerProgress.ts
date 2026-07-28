@@ -150,4 +150,3 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
 };
 
 export default usePlayerProgress;
-

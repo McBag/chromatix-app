@@ -8,7 +8,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
 
-import { ContextMenuAlbums, ContextMenuPlaylists, Favourite, Icon, StarRating } from 'js/components';
+import {
+  ContextMenuAlbums,
+  ContextMenuArtists,
+  ContextMenuCollections,
+  ContextMenuPlaylists,
+  ContextMenuTracks,
+  Favourite,
+  Icon,
+  StarRating,
+} from 'js/components';
 import { useScrollToTrack, useScrollToVirtualTrack, useWindowSize } from 'js/hooks';
 import platformFeatures from 'js/_config/platformFeatures';
 
@@ -30,6 +39,7 @@ const ViewGrid = ({
   children,
   variant,
   groupBy,
+  collectionId,
   folderId,
   entries,
   playingOrder,
@@ -94,6 +104,7 @@ const ViewGrid = ({
       <div className={clsx(style.wrap)}>
         <ListBodyComponent
           entries={entriesWithTrackNumbers}
+          collectionId={collectionId}
           folderId={folderId}
           groupBy={groupBy}
           iconImage={iconImage}
@@ -117,6 +128,7 @@ const ViewGrid = ({
 
 const ListBodyStatic = ({
   entries,
+  collectionId,
   folderId,
   groupBy,
   iconImage,
@@ -174,6 +186,7 @@ const ListBodyStatic = ({
               <ListEntry
                 key={variant + '-' + entryKey}
                 variant={variant}
+                collectionId={collectionId}
                 iconImage={iconImage}
                 folderId={folderId}
                 playingOrder={playingOrder}
@@ -208,6 +221,7 @@ let innerRef;
 
 const ListBodyVirtual = ({
   entries,
+  collectionId,
   folderId,
   iconImage,
   isCurrentlyLoaded,
@@ -402,6 +416,7 @@ const ListBodyVirtual = ({
                 <ListEntry
                   key={variant + '-' + entryKey}
                   variant={variant}
+                  collectionId={collectionId}
                   iconImage={iconImage}
                   folderId={folderId}
                   playingOrder={playingOrder}
@@ -514,6 +529,7 @@ const ListEntry = React.memo(
     thumbSm,
     title,
     albumId,
+    albumLink,
     artist,
     artistId,
     artistLink,
@@ -521,7 +537,9 @@ const ListEntry = React.memo(
     folderId,
     iconImage,
     playlistId,
+    playlistItemID,
     trackId,
+    type,
     isFavourite,
     userRating,
     link,
@@ -540,8 +558,7 @@ const ListEntry = React.memo(
     const currentLibraryId = useSelector(({ sessionModel }) => sessionModel.currentLibrary?.libraryId);
 
     const resolvedArtistLink =
-      artistLink ||
-      (artistId && currentLibraryId ? `/libraries/${currentLibraryId}/artists/${artistId}` : null);
+      artistLink || (artistId && currentLibraryId ? `/libraries/${currentLibraryId}/artists/${artistId}` : null);
 
     const entryLink =
       link ||
@@ -661,9 +678,12 @@ const ListEntry = React.memo(
     const isIconCard = iconImage && !thumbSm && !trackId;
     const isSquareCard = !isIconCard || variant === 'folders';
 
-    // Context menu is only applicable to album and playlist cards
+    // Context menu is only applicable to artist, album, playlist, collection, and track cards
+    const isArtist = variant === 'artists';
     const isAlbum = variant === 'albums' || variant === 'artistAlbums';
     const isPlaylist = variant === 'playlists';
+    const isCollection = variant === 'collections';
+    const isTrack = variant === 'folders' && !!trackId;
 
     const card = (
       <div
@@ -770,16 +790,44 @@ const ListEntry = React.memo(
       </div>
     );
 
+    if (isArtist) {
+      return <ContextMenuArtists artist={{ artistId, title, collectionId, link }}>{card}</ContextMenuArtists>;
+    }
+
     if (isAlbum) {
       return (
-        <ContextMenuAlbums album={{ albumId, title, artistId, artistLink }} showArtist={variant !== 'artistAlbums'}>
+        <ContextMenuAlbums
+          album={{ albumId, title, artistId, artistLink, collectionId, link }}
+          showArtist={variant !== 'artistAlbums'}
+        >
           {card}
         </ContextMenuAlbums>
       );
     }
 
     if (isPlaylist) {
-      return <ContextMenuPlaylists playlist={{ playlistId, playlistTitle: title }}>{card}</ContextMenuPlaylists>;
+      return <ContextMenuPlaylists playlist={{ playlistId, playlistTitle: title, link }}>{card}</ContextMenuPlaylists>;
+    }
+
+    if (isCollection) {
+      return (
+        <ContextMenuCollections collection={{ collectionId, collectionTitle: title, collectionType: type, link }}>
+          {card}
+        </ContextMenuCollections>
+      );
+    }
+
+    if (isTrack) {
+      return (
+        <ContextMenuTracks
+          track={{ trackId, title, artistLink, albumLink, playlistItemID }}
+          playlistId={null}
+          showArtist={true}
+          showAlbum={true}
+        >
+          {card}
+        </ContextMenuTracks>
+      );
     }
 
     return card;

@@ -5,7 +5,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useParams } from 'react-router-dom';
 
-import { Favourite, FilterMenu, ViewList, Loading, StarRating, TitleHeading } from 'js/components';
+import { Favourite, ActionMenu, ViewList, Loading, StarRating, TitleHeading } from 'js/components';
 import { useContextMenuAlbums, useGetAlbumDetail } from 'js/hooks';
 import platformFeatures from 'js/_config/platformFeatures';
 
@@ -241,8 +241,8 @@ const Title = ({
       }
       optionsMenu={
         <>
-          <div className="filterIconWrap">
-            <FilterMenu
+          <div className="actionIconWrap">
+            <ActionMenu
               variant="Large"
               label="Options"
               icon="CogIcon"
@@ -302,8 +302,8 @@ const Title = ({
               ]}
             />
           </div>
-          <div className="filterIconWrap">
-            <FilterMenu variant="Large" label="More" icon="EllipsisIcon" entries={contextEntries} />
+          <div className="actionIconWrap">
+            <ActionMenu variant="Large" label="More" icon="EllipsisIcon" entries={contextEntries} />
           </div>
         </>
       }

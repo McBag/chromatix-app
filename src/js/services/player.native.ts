@@ -812,4 +812,3 @@ export const handleBecameHidden = (): void => {
     }, delayMs);
   });
 };
-

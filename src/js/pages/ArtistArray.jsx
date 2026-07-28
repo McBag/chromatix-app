@@ -5,11 +5,11 @@
 import { useSelector } from 'react-redux';
 
 import {
+  ActionMenu,
+  ActionSort,
+  ActionToggle,
+  ActionWrap,
   AlphabetNav,
-  FilterMenu,
-  FilterSelect,
-  FilterToggle,
-  FilterWrap,
   ViewGrid,
   ViewList,
   Loading,
@@ -162,8 +162,8 @@ const Title = ({
         }
         padding={!isListView && !isGridView}
       />
-      <FilterWrap padding={true} inset={isListView || isGridView}>
-        <FilterToggle
+      <ActionWrap padding={true} inset={isListView || isGridView}>
+        <ActionToggle
           value={viewArtists}
           options={[
             { value: 'grid', label: 'Grid view' },
@@ -174,8 +174,9 @@ const Title = ({
         />
         {viewArtists === 'grid' && (
           <>
-            <FilterSelect
-              value={sortArtists}
+            <ActionSort
+              sortValue={sortArtists}
+              orderValue={orderArtists}
               options={[
                 { value: 'title', label: 'Alphabetical' },
                 ...(platformOpts?.enableAddedAt ? [{ value: 'addedAt', label: 'Date added' }] : []),
@@ -183,18 +184,10 @@ const Title = ({
                 ...(platformOpts?.enableIsFavourite ? [{ value: 'isFavourite', label: 'Favourites' }] : []),
                 ...(platformOpts?.enableUserRating ? [{ value: 'userRating', label: 'Rating' }] : []),
               ]}
-              setter={setSortArtists}
+              setSort={setSortArtists}
+              setOrder={setOrderArtists}
             />
-            <FilterToggle
-              value={orderArtists}
-              options={[
-                { value: 'asc', label: 'Ascending' },
-                { value: 'desc', label: 'Descending' },
-              ]}
-              setter={setOrderArtists}
-              icon={orderArtists === 'asc' ? 'ArrowDownLongIcon' : 'ArrowUpLongIcon'}
-            />
-            <FilterMenu
+            <ActionMenu
               label="Options"
               icon="CogIcon"
               setter={setColumnVisibility}
@@ -224,7 +217,7 @@ const Title = ({
           </>
         )}
         {viewArtists === 'list' && (
-          <FilterMenu
+          <ActionMenu
             label="Options"
             icon="CogIcon"
             setter={setColumnVisibility}
@@ -294,7 +287,7 @@ const Title = ({
             ]}
           />
         )}
-      </FilterWrap>
+      </ActionWrap>
     </>
   );
 };

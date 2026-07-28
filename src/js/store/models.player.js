@@ -723,9 +723,7 @@ const effects = (dispatch) => ({
         const trackAlbumId = currentTrack?.albumId ?? null;
         const sessionAlbumId = rootState.sessionModel.playingAlbumId;
         const albumChanged =
-          trackAlbumId != null &&
-          sessionAlbumId != null &&
-          String(trackAlbumId) !== String(sessionAlbumId);
+          trackAlbumId != null && sessionAlbumId != null && String(trackAlbumId) !== String(sessionAlbumId);
         const resolvedArtistId = resolveArtistIdFromTrack(currentTrack, rootState);
 
         dispatch.playerModel.setPlayerState({
@@ -1104,7 +1102,11 @@ const effects = (dispatch) => ({
 
     // Re-read from store — prefetch may have extended the queue mid-flight.
     const live = store.getState().sessionModel;
-    if (live.playingTrackIndex != null && live.playingTrackCount != null && live.playingTrackIndex < live.playingTrackCount - 1) {
+    if (
+      live.playingTrackIndex != null &&
+      live.playingTrackCount != null &&
+      live.playingTrackIndex < live.playingTrackCount - 1
+    ) {
       dispatch.playerModel.playerNext(true);
       return;
     }
@@ -1198,9 +1200,7 @@ const effects = (dispatch) => ({
         // If discography is loaded and still null → no further album (stop retry spam).
         // If discography missing → leave prefetched false so keep-alive can retry later.
         const artistId = playingArtistId || store.getState().sessionModel.playingArtistId;
-        const discography = artistId
-          ? store.getState().appModel.allArtistAlbums?.[libraryId + '-' + artistId]
-          : null;
+        const discography = artistId ? store.getState().appModel.allArtistAlbums?.[libraryId + '-' + artistId] : null;
         const discographyReady = Array.isArray(discography) && discography.length > 0;
         dispatch.sessionModel.setSessionState({
           _adjacentAlbumLoading: false,
@@ -1327,10 +1327,7 @@ const effects = (dispatch) => ({
       } else if (attempt < 5) {
         // Queue insert may have raced — retry before full replace.
         holdMediaFocus();
-        window.setTimeout(
-          () => dispatch.playerModel.playerLoadAdjacentAlbum({ attempt: attempt + 1 }),
-          300
-        );
+        window.setTimeout(() => dispatch.playerModel.playerLoadAdjacentAlbum({ attempt: attempt + 1 }), 300);
       } else {
         // Last resort: full load of adjacent album (keeps playback going).
         holdMediaFocus();

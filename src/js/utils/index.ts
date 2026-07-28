@@ -19,3 +19,4 @@ export { default as sendToElectron } from './sendToElectron';
 export { default as setLocalStorage } from './setLocalStorage';
 export { default as sortList, getAlphabetLetter, findAlphabetEntryIndex } from './sortList';
 export { teslaSetMetadataFromTrack, formatMediaSessionTitle } from './teslaArtworkFix';
+export { default as validateEntityName } from './validateEntityName';

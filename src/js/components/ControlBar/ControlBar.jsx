@@ -8,7 +8,13 @@ import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 
 import { Favourite, Icon, PopoverMenu, RangeSlider, StarRating, ContextMenuTracks } from 'js/components';
-import { useKeyPlaybackControls, useKeyMediaControls, useMediaControls, useMediaMeta, usePlayerProgress } from 'js/hooks';
+import {
+  useKeyPlaybackControls,
+  useKeyMediaControls,
+  useMediaControls,
+  useMediaMeta,
+  usePlayerProgress,
+} from 'js/hooks';
 import { analyticsEvent, durationToStringShort } from 'js/utils';
 import platformFeatures from 'js/_config/platformFeatures';
 
@@ -60,97 +66,97 @@ const NowPlaying = () => {
     <div className={style.nowPlayingOuter}>
       <ContextMenuTracks track={trackCurrent}>
         <div className={style.nowPlayingInner}>
-      <div className={clsx(style.coverWrap, { [style.coverPlaceholder]: !trackCurrent || !trackCurrent?.thumbSm })}>
-        {trackCurrent && (
-          <>
-            {trackCurrent.thumbSm && (
-              <div className={style.coverArtwork}>
-                <img src={trackCurrent.thumbSm} alt={trackCurrent.title} draggable="false" />
-              </div>
-            )}
-            {playingLink && (
-              <NavLink
-                className={style.coverLink}
-                to={playingLink}
-                draggable="false"
-                onClick={() => {
-                  dispatch.appModel.setAppState({ scrollToPlaying: true });
-                  analyticsEvent('Navigate to Playing');
-                }}
-              />
-            )}
-          </>
-        )}
-      </div>
-
-      <div className={style.detailsWrap}>
-        {/* Always reserve fixed line slots when enabled so the bar never shifts between songs. */}
-        {controlBarTitle && (
-          <div className={style.title}>
-            {trackCurrent?.title || <span className={style.linePlaceholder}>–</span>}
-          </div>
-        )}
-
-        {controlBarArtist && (
-          <div className={style.artist}>
-            {trackCurrent?.artistLink ? (
-              <NavLink to={trackCurrent.artistLink} draggable="false">
-                {trackCurrent.artist}
-              </NavLink>
-            ) : trackCurrent?.artist ? (
-              trackCurrent.artist
-            ) : (
-              <span className={style.linePlaceholder}>–</span>
-            )}
-          </div>
-        )}
-
-        {controlBarAlbum && (
-          <div className={style.album}>
-            {trackCurrent?.albumLink ? (
-              <NavLink to={trackCurrent.albumLink} draggable="false">
-                {trackCurrent.album}
-              </NavLink>
-            ) : trackCurrent?.album ? (
-              trackCurrent.album
-            ) : (
-              <span className={style.linePlaceholder}>–</span>
-            )}
-          </div>
-        )}
-
-        {(controlBarIsFavourite && platformOpts?.enableIsFavourite) ||
-        (controlBarUserRating && platformOpts?.enableUserRating) ? (
-          <div className={style.metaRow}>
-            {controlBarIsFavourite && platformOpts?.enableIsFavourite && (
-              <div className={style.favourite}>
-                {trackCurrent ? (
-                  <Favourite
-                    type="track"
-                    itemId={trackCurrent.trackId}
-                    isFavourite={trackCurrent.isFavourite}
-                    size={14}
-                    editable
+          <div className={clsx(style.coverWrap, { [style.coverPlaceholder]: !trackCurrent || !trackCurrent?.thumbSm })}>
+            {trackCurrent && (
+              <>
+                {trackCurrent.thumbSm && (
+                  <div className={style.coverArtwork}>
+                    <img src={trackCurrent.thumbSm} alt={trackCurrent.title} draggable="false" />
+                  </div>
+                )}
+                {playingLink && (
+                  <NavLink
+                    className={style.coverLink}
+                    to={playingLink}
+                    draggable="false"
+                    onClick={() => {
+                      dispatch.appModel.setAppState({ scrollToPlaying: true });
+                      analyticsEvent('Navigate to Playing');
+                    }}
                   />
-                ) : null}
-              </div>
-            )}
-            {controlBarUserRating && platformOpts?.enableUserRating && (
-              <div className={style.rating}>
-                {trackCurrent ? (
-                  <StarRating
-                    type="track"
-                    ratingKey={trackCurrent.trackId}
-                    rating={trackCurrent.userRating}
-                    editable
-                    size={13}
-                  />
-                ) : null}
-              </div>
+                )}
+              </>
             )}
           </div>
-        ) : null}
-      </div>
+
+          <div className={style.detailsWrap}>
+            {/* Always reserve fixed line slots when enabled so the bar never shifts between songs. */}
+            {controlBarTitle && (
+              <div className={style.title}>
+                {trackCurrent?.title || <span className={style.linePlaceholder}>–</span>}
+              </div>
+            )}
+
+            {controlBarArtist && (
+              <div className={style.artist}>
+                {trackCurrent?.artistLink ? (
+                  <NavLink to={trackCurrent.artistLink} draggable="false">
+                    {trackCurrent.artist}
+                  </NavLink>
+                ) : trackCurrent?.artist ? (
+                  trackCurrent.artist
+                ) : (
+                  <span className={style.linePlaceholder}>–</span>
+                )}
+              </div>
+            )}
+
+            {controlBarAlbum && (
+              <div className={style.album}>
+                {trackCurrent?.albumLink ? (
+                  <NavLink to={trackCurrent.albumLink} draggable="false">
+                    {trackCurrent.album}
+                  </NavLink>
+                ) : trackCurrent?.album ? (
+                  trackCurrent.album
+                ) : (
+                  <span className={style.linePlaceholder}>–</span>
+                )}
+              </div>
+            )}
+
+            {(controlBarIsFavourite && platformOpts?.enableIsFavourite) ||
+            (controlBarUserRating && platformOpts?.enableUserRating) ? (
+              <div className={style.metaRow}>
+                {controlBarIsFavourite && platformOpts?.enableIsFavourite && (
+                  <div className={style.favourite}>
+                    {trackCurrent ? (
+                      <Favourite
+                        type="track"
+                        itemId={trackCurrent.trackId}
+                        isFavourite={trackCurrent.isFavourite}
+                        size={14}
+                        editable
+                      />
+                    ) : null}
+                  </div>
+                )}
+                {controlBarUserRating && platformOpts?.enableUserRating && (
+                  <div className={style.rating}>
+                    {trackCurrent ? (
+                      <StarRating
+                        type="track"
+                        ratingKey={trackCurrent.trackId}
+                        rating={trackCurrent.userRating}
+                        editable
+                        size={13}
+                      />
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       </ContextMenuTracks>
     </div>
