@@ -4,10 +4,10 @@ Keep this fork current without re-applying Tesla patches from scratch.
 
 ## Remotes
 
-| Remote | URL |
-| ------ | --- |
+| Remote     | URL                                                  |
+| ---------- | ---------------------------------------------------- |
 | `upstream` | `https://github.com/chromatix-app/chromatix-app.git` |
-| `origin` | your GitHub fork (optional) |
+| `origin`   | your GitHub fork (optional)                          |
 
 ```powershell
 # from the Tesla fork root
@@ -22,8 +22,9 @@ git remote -v
 … upstream history …
     0.66.0
       └── Tesla customizations   (commit on top of 0.66.0)
-            └── Merge 0.67.0              (current main)
-                  └── later merges…
+            └── Merge 0.67.0
+                  └── Merge 0.68.0        (current main)
+                        └── later merges…
 ```
 
 Backup of the pre-rebuild single commit: branch `backup/pre-upstream-rebuild`.
@@ -71,7 +72,7 @@ Do **not** download a zip and overwrite the tree. Merging preserves:
 
 Behaviour and file checklist: **`TESLA_CUSTOMIZATIONS_REAPPLY.md`**.
 
-Use that doc when a conflict is large (e.g. full player rewrite) and you need the *why*, not only the diff.
+Use that doc when a conflict is large (e.g. full player rewrite) and you need the _why_, not only the diff.
 
 ## Bridge note (0.67+)
 

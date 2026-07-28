@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { FilterToggle, FilterWrap, Loading, TitleHeading, ViewGrid, ViewList } from 'js/components';
+import { ActionToggle, ActionWrap, Loading, TitleHeading, ViewGrid, ViewList } from 'js/components';
 import { useGetAlbumArray } from 'js/hooks';
 
 const shuffle = (entries) => {
@@ -40,8 +40,8 @@ const RandomAlbums = () => {
         subtitle={sortedAlbums ? `${sortedAlbums.length} albums` : <>&nbsp;</>}
         padding={!isListView && !isGridView}
       />
-      <FilterWrap padding={!isListView && !isGridView}>
-        <FilterToggle
+      <ActionWrap padding={!isListView && !isGridView}>
+        <ActionToggle
           value={viewAlbums}
           options={[
             { value: 'grid', label: 'Grid view' },
@@ -50,7 +50,7 @@ const RandomAlbums = () => {
           setter={setViewAlbums}
           icon={viewAlbums === 'grid' ? 'GridIcon' : 'ListIcon'}
         />
-      </FilterWrap>
+      </ActionWrap>
       {isLoading && <Loading forceVisible inline showOffline />}
       {isGridView && (
         <ViewGrid
