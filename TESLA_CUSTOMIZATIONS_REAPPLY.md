@@ -2,7 +2,7 @@
 
 **Base version:** Chromatix `0.68.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.68.0`  
 **Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0` and `0.68.0`  
-**Last updated:** 2026-07-28  
+**Last updated:** 2026-07-28 (playback keep-alive hardened: no mid-track reload, safer wall-clock advance, DASH keep-alive parity)  
 **Build system:** Vite 8 + Rolldown (upstream) — **not** CRA  
 **Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)  
 **Routine upgrades:** see **`UPSTREAM_SYNC.md`** (git merge workflow)

@@ -5,15 +5,20 @@
 const trackEndPollMs = 250;
 const trackEndEpsilonMs = 100;
 const playRetryMs = 300;
-const hiddenPlayRetryMs = 150;
-const hiddenPlayMaxRetries = 12;
-const hiddenPlayReloadThreshold = 4;
-const hiddenLoadRecoveryMs = 150;
-const hiddenLoadRecoveryMaxMs = 120000;
-const reloadReadyTimeoutMs = 1500;
+const hiddenPlayRetryMs = 200;
+const hiddenPlayMaxRetries = 16;
+// Only hard-reload after many failed play() attempts — mid-stream load() kills Tesla BT focus.
+const hiddenPlayReloadThreshold = 10;
+const hiddenLoadRecoveryMs = 200;
+const hiddenLoadRecoveryMaxMs = 180000;
+const reloadReadyTimeoutMs = 2000;
 const HAVE_CURRENT_DATA = 2;
 const HAVE_FUTURE_DATA = 3;
-const progressStallMs = 1500;
+// Visible tabs sample frequently; hidden Tesla timers are coarser so use a wider stall window.
+const progressStallMsVisible = 1500;
+const progressStallMsHidden = 5000;
+// Never hard-reload once we are more than a few seconds into a track.
+const midTrackReloadGuardMs = 4000;
 
 let playerContainer: HTMLDivElement | null = null;
 let trackEndPollId: number | null = null;
@@ -254,9 +259,11 @@ const samplePlaybackProgress = (element: HTMLAudioElement): void => {
 
 const isProgressAdvancing = (): boolean => {
   if (!progressHasMoved || lastProgressSampleTime === 0) return false;
-  // Wider window: Tesla throttles timers heavily when minimized, so samples
-  // may arrive every 1s+ even while audio is still advancing.
-  return Date.now() - lastProgressSampleTime < progressStallMs;
+  // Wider window when hidden: Tesla throttles timers heavily when minimized, so
+  // samples may arrive every few seconds even while audio is still advancing.
+  const isHidden = typeof document !== 'undefined' && document.hidden;
+  const stallMs = isHidden ? progressStallMsHidden : progressStallMsVisible;
+  return Date.now() - lastProgressSampleTime < stallMs;
 };
 
 const isElementAudible = (element: HTMLAudioElement): boolean => {
@@ -390,10 +397,14 @@ export const ensureHiddenLoadRecovery = (): void => {
   }
 };
 
-export const unload = (): void => {
+export const unload = (opts?: { preserveKeepAlive?: boolean }): void => {
   console.log('%c--- player - unload ---', 'color:#a18507');
   stopHiddenLoadRecovery();
-  stopAudioKeepAlive();
+  // When handing off to DASH, keep the silent Web Audio oscillator running so
+  // Tesla does not drop Bluetooth/media focus during the cold-load gap.
+  if (!opts?.preserveKeepAlive) {
+    stopAudioKeepAlive();
+  }
   if (playerElement) {
     playerElement.pause();
     playerElement.src = '';
@@ -402,7 +413,7 @@ export const unload = (): void => {
   advanceFired = false;
   hiddenPlayFailCount = 0;
   stopTrackEndPolling();
-  if ('mediaSession' in navigator) {
+  if (!opts?.preserveKeepAlive && 'mediaSession' in navigator) {
     navigator.mediaSession.playbackState = 'none';
   }
 };
@@ -468,7 +479,16 @@ const attemptElementPlay = (
       }
 
       if (typeof document !== 'undefined' && document.hidden && hiddenPlayFailCount >= hiddenPlayReloadThreshold) {
-        reloadElementAndPlay(element, playToken, onSuccess);
+        // Hard reload mid-track often kills Tesla media focus. Only do it near
+        // the start of a track (or before progress has moved).
+        const progressMs = (element.currentTime || 0) * 1000;
+        if (!progressHasMoved || progressMs < midTrackReloadGuardMs) {
+          reloadElementAndPlay(element, playToken, onSuccess);
+        } else {
+          // Soft recovery: keep trying play() without destroying the buffer.
+          hiddenPlayFailCount = Math.floor(hiddenPlayReloadThreshold / 2);
+          window.setTimeout(() => attemptElementPlay(element, playToken, 0, onSuccess), hiddenPlayRetryMs);
+        }
       }
     });
 };
@@ -478,6 +498,14 @@ const reloadElementAndPlay = (element: HTMLAudioElement, playToken: number, onSu
   if (!src || pausedByUser || playToken !== activePlayToken) return;
 
   const savedTime = element.currentTime;
+  // Avoid full load() when we already have a position mid-track — it resets the
+  // network pipeline and can leave Tesla silent until the next user gesture.
+  if (savedTime * 1000 >= midTrackReloadGuardMs && progressHasMoved) {
+    hiddenPlayFailCount = 0;
+    attemptElementPlay(element, playToken, 0, onSuccess);
+    return;
+  }
+
   hiddenPlayFailCount = 0;
   element.load();
   if (savedTime > 0) {

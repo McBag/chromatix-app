@@ -89,7 +89,10 @@ export const unload = (): void => {
 export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolean = true): boolean => {
   const transcoding = requiresTranscoding(track.codec);
   if (transcoding && track.dashSrc && dashX.isSupported()) {
-    nativeX.unload();
+    // Preserve silent Web Audio keep-alive across the native→DASH handoff so
+    // Tesla does not drop Bluetooth focus while the DASH manifest loads.
+    nativeX.unload({ preserveKeepAlive: true });
+    if (play) nativeX.ensureAudioKeepAlive();
     dashX.loadTrack(track.dashSrc, progress, play);
     activePlayer = 'dash';
   } else if (transcoding && !track.dashSrc && track.trackKey && dashX.isSupported()) {
@@ -169,7 +172,7 @@ export const setVolume = (volumeLevel: number): void => {
 // ======================================================================
 
 export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
-  if (activePlayer === 'dash') return null;
+  if (activePlayer === 'dash') return dashX.getCurrentPlayerElement();
   return nativeX.getCurrentPlayerElement();
 };
 
@@ -186,6 +189,7 @@ export const setTrackEndedCallback = (handler: (() => void) | null): void => {
 };
 
 export const requestTrackAdvance = (): void => {
+  // Latch + callback live on native regardless of which engine is active.
   nativeX.requestTrackAdvance();
 };
 
@@ -196,16 +200,22 @@ export const clearManualPauseFlag = (): void => {
 export const isManualPause = (): boolean => nativeX.isManualPause();
 
 export const isPlaybackExpected = (): boolean => {
-  if (activePlayer === 'dash') return true;
+  if (activePlayer === 'dash') return !nativeX.isManualPause();
   return nativeX.isPlaybackExpected();
 };
 
 export const ensureActivePlayback = (): void => {
-  if (activePlayer === 'native') nativeX.ensureActivePlayback();
+  if (activePlayer === 'dash') {
+    if (!nativeX.isManualPause()) dashX.ensureActivePlayback();
+    return;
+  }
+  nativeX.ensureActivePlayback();
 };
 
 export const ensureAudioKeepAlive = (): void => {
-  if (activePlayer === 'native') nativeX.ensureAudioKeepAlive();
+  // Silent oscillator always lives on native; keep it running for DASH too so
+  // Tesla does not hand audio focus to another app between segments.
+  if (!nativeX.isManualPause()) nativeX.ensureAudioKeepAlive();
 };
 
 export const stopAudioKeepAlive = (): void => {
@@ -213,7 +223,11 @@ export const stopAudioKeepAlive = (): void => {
 };
 
 export const ensureHiddenLoadRecovery = (): void => {
-  if (activePlayer === 'native') nativeX.ensureHiddenLoadRecovery();
+  if (activePlayer === 'dash') {
+    if (!nativeX.isManualPause()) dashX.ensureActivePlayback();
+    return;
+  }
+  nativeX.ensureHiddenLoadRecovery();
 };
 
 export const isHiddenLoadRecoveryActive = (): boolean => {
@@ -222,19 +236,52 @@ export const isHiddenLoadRecoveryActive = (): boolean => {
 };
 
 export const syncHiddenMediaSession = (positionSec?: number, durationSec?: number): void => {
-  if (activePlayer === 'native') nativeX.syncHiddenMediaSession(positionSec, durationSec);
+  if (activePlayer === 'dash') {
+    if (nativeX.isManualPause() || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = 'playing';
+    if (typeof navigator.mediaSession.setPositionState !== 'function') return;
+    const el = dashX.getCurrentPlayerElement();
+    const position = positionSec ?? el?.currentTime ?? 0;
+    const duration = durationSec ?? el?.duration ?? 0;
+    if (duration <= 0 || Number.isNaN(duration)) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        position: Math.min(Math.max(position, 0), duration),
+        playbackRate: 1,
+      });
+    } catch {
+      // ignore invalid states
+    }
+    return;
+  }
+  nativeX.syncHiddenMediaSession(positionSec, durationSec);
 };
 
 export const runBackgroundPlaybackTick = (): void => {
-  if (activePlayer === 'native') nativeX.runBackgroundPlaybackTick();
+  if (activePlayer === 'dash') {
+    if (nativeX.isManualPause()) return;
+    const ended = dashX.runBackgroundPlaybackTick();
+    if (ended) {
+      nativeX.requestTrackAdvance();
+      return;
+    }
+    nativeX.ensureAudioKeepAlive();
+    return;
+  }
+  nativeX.runBackgroundPlaybackTick();
 };
 
 export const nudgeActivePlayback = (): void => {
-  if (activePlayer === 'native') nativeX.nudgeActivePlayback();
+  if (activePlayer === 'dash') {
+    if (!nativeX.isManualPause()) dashX.ensureActivePlayback();
+    return;
+  }
+  nativeX.nudgeActivePlayback();
 };
 
 export const isActivePlaybackAudible = (): boolean => {
-  if (activePlayer === 'dash') return true;
+  if (activePlayer === 'dash') return dashX.isActivePlaybackAudible();
   return nativeX.isActivePlaybackAudible();
 };
 
@@ -244,12 +291,19 @@ export const getPlaybackProgressMs = (): number => {
 };
 
 export const getCurrentDuration = (): number => {
-  if (activePlayer === 'dash') return 0;
+  if (activePlayer === 'dash') return dashX.getCurrentDuration();
   return nativeX.getCurrentDuration();
 };
 
 export const handleBecameHidden = (): void => {
-  if (activePlayer === 'native') nativeX.handleBecameHidden();
+  if (activePlayer === 'dash') {
+    if (!nativeX.isManualPause()) {
+      nativeX.ensureAudioKeepAlive();
+      dashX.handleBecameHidden();
+    }
+    return;
+  }
+  nativeX.handleBecameHidden();
 };
 
 // ======================================================================

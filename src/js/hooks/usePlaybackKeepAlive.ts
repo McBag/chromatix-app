@@ -103,10 +103,9 @@ const usePlaybackKeepAlive = (): null => {
       const currentTrack = trackKey != null ? playingTrackList?.[trackKey] : null;
       const durationMs = currentTrack?.duration || playerX.getCurrentDuration() * 1000;
 
-      // Seed / calibrate wall-clock start using the element's current position.
-      // This is deferred (see track key effect) so that initial buffering delay
-      // does not cause wall-clock to fire early and cut the track short.
-      // When element stalls in background, real-time keeps ticking from last known position.
+      // Seed wall-clock start from real playback progress (deferred so buffering
+      // at track start does not cut the song short). Pure wall-clock without a
+      // progress near-end check used to skip mid-track after long stalls.
       const playedMs = playerX.getPlaybackProgressMs();
       if (!trackStartRef.current) {
         const sinceTrackChange = Date.now() - trackChangedAtRef.current;
@@ -117,8 +116,19 @@ const usePlaybackKeepAlive = (): null => {
       }
       const trackStart = trackStartRef.current;
 
-      if (durationMs > 0 && trackStart && Date.now() - trackStart >= durationMs - wallClockEndEpsilonMs) {
-        playerX.requestTrackAdvance();
+      // Advance only when we are actually near the end of the track.
+      // - Progress near end: normal path (element currentTime ~ duration)
+      // - Wall-clock past duration AND progress already ≥85% / within 15s of end:
+      //   covers Tesla cases where currentTime freezes at the last buffer point
+      //   without firing `ended`, without skipping mid-track stalls.
+      if (durationMs > 0) {
+        const nearEndByProgress = playedMs >= durationMs - wallClockEndEpsilonMs;
+        const progressNearEnd = playedMs >= Math.max(durationMs * 0.85, durationMs - 15000);
+        const wallPastEnd =
+          Boolean(trackStart) && Date.now() - (trackStart as number) >= durationMs + 2000 && progressNearEnd;
+        if (nearEndByProgress || wallPastEnd) {
+          playerX.requestTrackAdvance();
+        }
       }
 
       // Near end of last album track(s): keep kicking prefetch so Tesla background

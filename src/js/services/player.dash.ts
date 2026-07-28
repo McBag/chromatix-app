@@ -177,26 +177,74 @@ export const getCurrentProgress = (): number => {
   return audioElement?.currentTime || 0;
 };
 
-// ======================================================================
-// PRELOADING STUBS
-// [NOTE] Not currently used, but may be in future
-// ======================================================================
+export const getCurrentDuration = (): number => {
+  return audioElement?.duration || 0;
+};
 
-// export const updateProgress = (): void => {
-//   return;
-// };
+export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
+  return audioElement;
+};
 
-// export const preloadNextTrack = (): void => {
-//   return;
-// };
+/**
+ * Tesla/background recovery for DASH. dash.js has no native keep-alive path;
+ * when the OS auto-pauses the element we re-assert play.
+ */
+export const ensureActivePlayback = (): void => {
+  if (!mediaPlayer || !audioElement || !supported || needsReinit) return;
+  if (audioElement.ended) return;
 
-// export const setNextTrack = (): void => {
-//   return;
-// };
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = 'playing';
+  }
 
-// export const clearNextTrack = (): void => {
-//   return;
-// };
+  if (audioElement.paused) {
+    try {
+      mediaPlayer.play();
+    } catch {
+      // ignore
+    }
+    void Promise.resolve(audioElement.play()).catch(() => null);
+  }
+};
+
+export const isActivePlaybackAudible = (): boolean => {
+  if (!audioElement || needsReinit) return false;
+  // dash.js uses MediaSource; do not require element.src to be a http URL.
+  return !audioElement.paused && !audioElement.ended && audioElement.readyState >= 2;
+};
+
+export const isElementAtTrackEnd = (): boolean => {
+  if (!audioElement) return false;
+  if (audioElement.ended) return true;
+  const duration = audioElement.duration;
+  if (!duration || duration <= 0 || Number.isNaN(duration)) return false;
+  return audioElement.currentTime >= duration - 0.15;
+};
+
+export const handleBecameHidden = (): void => {
+  if (!audioElement || needsReinit) return;
+  if (isElementAtTrackEnd()) return;
+  ensureActivePlayback();
+  [50, 200, 500, 1000, 2000, 4000].forEach((delayMs) => {
+    window.setTimeout(() => {
+      if (!audioElement || needsReinit) return;
+      if (isElementAtTrackEnd()) return;
+      if (audioElement.paused || !isActivePlaybackAudible()) {
+        ensureActivePlayback();
+      }
+    }, delayMs);
+  });
+};
+
+export const runBackgroundPlaybackTick = (): boolean => {
+  // Returns true when the track has ended and the caller should advance.
+  if (!audioElement || needsReinit) return false;
+  if (isElementAtTrackEnd()) return true;
+  if (audioElement.paused) {
+    ensureActivePlayback();
+  }
+  return false;
+};
 
 // ======================================================================
 // HELPERS
