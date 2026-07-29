@@ -225,7 +225,8 @@ export const handleBecameHidden = (): void => {
   if (!audioElement || needsReinit) return;
   if (isElementAtTrackEnd()) return;
   ensureActivePlayback();
-  [50, 200, 500, 1000, 2000, 4000].forEach((delayMs) => {
+  // Match native: long re-assert window — Tesla often re-pauses late after minimize.
+  [0, 50, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 60000, 120000].forEach((delayMs) => {
     window.setTimeout(() => {
       if (!audioElement || needsReinit) return;
       if (isElementAtTrackEnd()) return;

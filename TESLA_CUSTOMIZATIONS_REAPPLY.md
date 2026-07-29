@@ -2,7 +2,7 @@
 
 **Base version:** Chromatix `0.68.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.68.0`  
 **Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0` and `0.68.0`  
-**Last updated:** 2026-07-28 (playback keep-alive hardened: no mid-track reload, safer wall-clock advance, DASH keep-alive parity)  
+**Last updated:** 2026-07-29 (keep-alive v2: dual Web Audio + silent-loop, zombie stall recovery, longer hide re-assert up to 2 min, worker timeout-chain)  
 **Build system:** Vite 8 + Rolldown (upstream) — **not** CRA  
 **Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)  
 **Routine upgrades:** see **`UPSTREAM_SYNC.md`** (git merge workflow)
@@ -94,17 +94,17 @@ npx serve -s build -l 4173
 
 ### Files
 
-| File                                   | Changes                                                                                                                                                                                      |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/js/services/player.native.ts`     | Single attached `<audio>`, track-end polling, `requestTrackAdvance` guard, hidden stall recovery, Web Audio keep-alive oscillator, MediaSession `playbackState` / `setPositionState` helpers |
-| `src/js/services/player.ts`            | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native                        |
-| `src/js/store/models.player.js`        | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload                   |
-| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; 500 ms visible / 100 ms hidden poll; Worker timer when hidden; wall-clock end fallback; **no** pause/unload on hide                                                               |
-| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                      |
-| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                             |
-| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden                                                                                                                                                     |
-| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                             |
-| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                 |
+| File                                   | Changes                                                                                                                                                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/js/services/player.native.ts`     | Single attached `<audio>`, track-end polling, hidden stall + **zombie** recovery, **dual keep-alive** (Web Audio oscillator + looping near-silent `<audio>`), MediaSession helpers, long hide re-assert (≤2 min) |
+| `src/js/services/player.ts`            | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native                                            |
+| `src/js/store/models.player.js`        | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload                                       |
+| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; Worker + main interval + cascading timeout when hidden; recovery bursts to 2 min; wall-clock end fallback; **no** pause/unload on hide                                                                |
+| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                                          |
+| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                                                 |
+| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden                                                                                                                                                                         |
+| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                                                 |
+| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                                     |
 
 ### Behavior notes
 

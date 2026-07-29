@@ -5,32 +5,46 @@ import * as playerX from 'js/services/player';
 
 const hiddenPollMs = 100;
 const visiblePollMs = 500;
+// Main-thread fallback while hidden — Tesla throttles intervals hard; keep a slow pulse.
+const hiddenMainFallbackMs = 500;
 const wallClockEndEpsilonMs = 100;
-const hiddenRecoveryBurstMs = [0, 150, 400, 800, 1500, 3000, 5000, 10000, 15000, 30000];
+// Long recovery window after track change / minimize — Tesla re-kills streams late.
+const hiddenRecoveryBurstMs = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 15000, 30000, 45000, 60000, 90000, 120000];
 
 /**
  * Background timer that is less throttled than main-thread setInterval when the
  * tab is minimized (critical for Tesla browser multi-song auto-next).
+ * Uses both setInterval and a self-rescheduling setTimeout chain — some WebViews
+ * suspend one path while leaving the other runnable.
  */
 const createKeepAliveWorker = (): Worker | null => {
   if (typeof Worker === 'undefined') return null;
 
   try {
     const workerSource = `
-      let intervalId = null;
+      var intervalId = null;
+      var timeoutId = null;
+      var tickMs = 100;
+      function clearAll() {
+        if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
+        if (timeoutId !== null) { clearTimeout(timeoutId); timeoutId = null; }
+      }
+      function chainTick() {
+        self.postMessage({ type: 'tick' });
+        timeoutId = setTimeout(chainTick, tickMs);
+      }
       self.onmessage = function (event) {
         var data = event.data || {};
         if (data.type === 'start') {
-          if (intervalId !== null) clearInterval(intervalId);
-          var ms = typeof data.ms === 'number' ? data.ms : 100;
+          clearAll();
+          tickMs = typeof data.ms === 'number' ? data.ms : 100;
           intervalId = setInterval(function () {
             self.postMessage({ type: 'tick' });
-          }, ms);
+          }, tickMs);
+          // Parallel timeout chain — survives some WebView interval freezes.
+          timeoutId = setTimeout(chainTick, tickMs);
         } else if (data.type === 'stop') {
-          if (intervalId !== null) {
-            clearInterval(intervalId);
-            intervalId = null;
-          }
+          clearAll();
         }
       };
     `;
@@ -61,6 +75,13 @@ const usePlaybackKeepAlive = (): null => {
   );
   const adjacentAlbumPrefetched = useSelector(({ sessionModel }: any) => sessionModel._adjacentAlbumPrefetched);
   const lastPrefetchKickRef = useRef(0);
+  const chainTimeoutRef = useRef<number | null>(null);
+  const lastTickAtRef = useRef(0);
+  const playerPlayingRef = useRef(playerPlaying);
+  const manualPauseRef = useRef(manualPause);
+
+  playerPlayingRef.current = playerPlaying;
+  manualPauseRef.current = manualPause;
 
   useEffect(() => {
     const trackKey = playingTrackKeys?.[playingTrackIndex];
@@ -71,8 +92,16 @@ const usePlaybackKeepAlive = (): null => {
 
       if (document.hidden && playerPlaying && !manualPause) {
         playerX.ensureAudioKeepAlive();
+        playerX.handleBecameHidden();
         hiddenRecoveryBurstMs.forEach((delayMs) => {
-          window.setTimeout(() => playerX.nudgeActivePlayback(), delayMs);
+          window.setTimeout(() => {
+            if (manualPauseRef.current || !playerPlayingRef.current) return;
+            playerX.ensureAudioKeepAlive();
+            playerX.nudgeActivePlayback();
+            if (!playerX.isActivePlaybackAudible()) {
+              playerX.ensureHiddenLoadRecovery();
+            }
+          }, delayMs);
         });
       }
 
@@ -94,7 +123,12 @@ const usePlaybackKeepAlive = (): null => {
 
   useEffect(() => {
     const runTick = () => {
-      if (!playerPlaying || manualPause) return;
+      if (!playerPlayingRef.current || manualPauseRef.current) return;
+
+      // Deduplicate ticks when worker + main interval fire close together.
+      const now = Date.now();
+      if (now - lastTickAtRef.current < 40) return;
+      lastTickAtRef.current = now;
 
       playerX.runBackgroundPlaybackTick();
       playerX.ensureAudioKeepAlive();
@@ -150,7 +184,6 @@ const usePlaybackKeepAlive = (): null => {
         const nearAlbumEnd = remainingInAlbum > 0 && remainingInAlbum <= 3;
         const nearTrackEnd = durationMs > 0 && playedMs > 0 && durationMs - playedMs < 45000;
         if (nearQueueEnd || nearAlbumEnd || (nearTrackEnd && remainingInAlbum === 1)) {
-          const now = Date.now();
           if (now - lastPrefetchKickRef.current > 4000) {
             lastPrefetchKickRef.current = now;
             dispatch.playerModel.prefetchAdjacentAlbum();
@@ -173,6 +206,13 @@ const usePlaybackKeepAlive = (): null => {
       }
     };
 
+    const clearChainTimeout = () => {
+      if (chainTimeoutRef.current != null) {
+        window.clearTimeout(chainTimeoutRef.current);
+        chainTimeoutRef.current = null;
+      }
+    };
+
     const stopWorker = () => {
       if (workerRef.current) {
         try {
@@ -183,8 +223,19 @@ const usePlaybackKeepAlive = (): null => {
       }
     };
 
+    /** Main-thread cascading timeout — some Tesla builds throttle setInterval harder. */
+    const scheduleChain = (ms: number) => {
+      clearChainTimeout();
+      const tick = () => {
+        runTick();
+        chainTimeoutRef.current = window.setTimeout(tick, ms);
+      };
+      chainTimeoutRef.current = window.setTimeout(tick, ms);
+    };
+
     const schedulePoll = () => {
       clearMainPoll();
+      clearChainTimeout();
       stopWorker();
 
       const ms = document.hidden ? hiddenPollMs : visiblePollMs;
@@ -200,13 +251,18 @@ const usePlaybackKeepAlive = (): null => {
         if (workerRef.current) {
           try {
             workerRef.current.postMessage({ type: 'start', ms });
-            // Keep a slow main-thread fallback in case the worker is suspended.
-            pollIdRef.current = window.setInterval(runTick, 1000);
+            // Faster main-thread fallback + cascading timeout if worker is suspended.
+            pollIdRef.current = window.setInterval(runTick, hiddenMainFallbackMs);
+            scheduleChain(hiddenMainFallbackMs);
             return;
           } catch {
             // fall through to main-thread interval
           }
         }
+        // No worker: dual main-thread paths.
+        pollIdRef.current = window.setInterval(runTick, ms);
+        scheduleChain(ms);
+        return;
       }
 
       pollIdRef.current = window.setInterval(runTick, ms);
@@ -215,13 +271,24 @@ const usePlaybackKeepAlive = (): null => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         runTick();
-        if (!manualPause && playerPlaying) {
+        if (!manualPauseRef.current && playerPlayingRef.current) {
+          playerX.ensureAudioKeepAlive();
           playerX.handleBecameHidden();
           playerX.nudgeActivePlayback();
+          hiddenRecoveryBurstMs.forEach((delayMs) => {
+            window.setTimeout(() => {
+              if (manualPauseRef.current || !playerPlayingRef.current) return;
+              playerX.ensureAudioKeepAlive();
+              playerX.nudgeActivePlayback();
+              if (!playerX.isActivePlaybackAudible()) {
+                playerX.ensureHiddenLoadRecovery();
+              }
+            }, delayMs);
+          });
         }
-      } else if (playerPlaying && !manualPause && !playerX.isActivePlaybackAudible()) {
+      } else if (playerPlayingRef.current && !manualPauseRef.current && !playerX.isActivePlaybackAudible()) {
         dispatch.playerModel.playerResume();
-      } else if (playerPlaying && !manualPause) {
+      } else if (playerPlayingRef.current && !manualPauseRef.current) {
         playerX.nudgeActivePlayback();
         playerX.ensureAudioKeepAlive();
       }
@@ -229,7 +296,7 @@ const usePlaybackKeepAlive = (): null => {
     };
 
     const handlePageShow = () => {
-      if (playerPlaying && !manualPause && !playerX.isActivePlaybackAudible()) {
+      if (playerPlayingRef.current && !manualPauseRef.current && !playerX.isActivePlaybackAudible()) {
         dispatch.playerModel.playerResume();
       }
     };
@@ -237,20 +304,31 @@ const usePlaybackKeepAlive = (): null => {
     const handleBackgroundLifecycle = () => {
       if (document.hidden) {
         runTick();
-        if (!manualPause && playerPlaying) {
+        if (!manualPauseRef.current && playerPlayingRef.current) {
+          playerX.ensureAudioKeepAlive();
           playerX.handleBecameHidden();
         }
+      }
+    };
+
+    // Keep MediaSession play/pause handlers from dropping us while hidden.
+    const handleFocus = () => {
+      if (playerPlayingRef.current && !manualPauseRef.current) {
+        playerX.ensureAudioKeepAlive();
+        playerX.nudgeActivePlayback();
       }
     };
 
     schedulePoll();
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('focus', handleFocus);
     document.addEventListener('freeze', handleBackgroundLifecycle);
     window.addEventListener('pagehide', handleBackgroundLifecycle);
 
     return () => {
       clearMainPoll();
+      clearChainTimeout();
       stopWorker();
       if (workerRef.current) {
         try {
@@ -262,6 +340,7 @@ const usePlaybackKeepAlive = (): null => {
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', handleFocus);
       document.removeEventListener('freeze', handleBackgroundLifecycle);
       window.removeEventListener('pagehide', handleBackgroundLifecycle);
     };

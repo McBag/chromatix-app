@@ -3,7 +3,8 @@ import { useSelector } from 'react-redux';
 
 import * as playerX from 'js/services/player';
 
-const hiddenPollMs = 100;
+const hiddenPollMs = 250;
+const visiblePollMs = 3000;
 
 const useTeslaOptimization = (): null => {
   const playerPlaying = useSelector(({ playerModel }: any) => playerModel.playerPlaying);
@@ -13,6 +14,10 @@ const useTeslaOptimization = (): null => {
   const playingTrackList = useSelector(({ sessionModel }: any) => sessionModel.playingTrackList);
 
   const pollIdRef = useRef<number | null>(null);
+  const playerPlayingRef = useRef(playerPlaying);
+  const manualPauseRef = useRef(manualPause);
+  playerPlayingRef.current = playerPlaying;
+  manualPauseRef.current = manualPause;
 
   useEffect(() => {
     if (!playerPlaying || manualPause || !('mediaSession' in navigator)) {
@@ -24,7 +29,7 @@ const useTeslaOptimization = (): null => {
     }
 
     const syncMediaSession = () => {
-      if (!playerPlaying || manualPause) return;
+      if (!playerPlayingRef.current || manualPauseRef.current) return;
 
       const trackKey = playingTrackKeys?.[playingTrackIndex];
       const currentTrack = trackKey != null ? playingTrackList?.[trackKey] : null;
@@ -49,7 +54,7 @@ const useTeslaOptimization = (): null => {
       if (pollIdRef.current != null) {
         window.clearInterval(pollIdRef.current);
       }
-      const pollMs = document.hidden ? hiddenPollMs : 3000;
+      const pollMs = document.hidden ? hiddenPollMs : visiblePollMs;
       pollIdRef.current = window.setInterval(syncMediaSession, pollMs);
     };
 
@@ -58,6 +63,9 @@ const useTeslaOptimization = (): null => {
 
     const handleVisibility = () => {
       syncMediaSession();
+      if (document.hidden && playerPlayingRef.current && !manualPauseRef.current) {
+        playerX.handleBecameHidden();
+      }
       startMediaSessionPoll();
     };
 

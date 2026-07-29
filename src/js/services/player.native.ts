@@ -17,8 +17,17 @@ const HAVE_FUTURE_DATA = 3;
 // Visible tabs sample frequently; hidden Tesla timers are coarser so use a wider stall window.
 const progressStallMsVisible = 1500;
 const progressStallMsHidden = 5000;
+// Zombie stall: element claims "playing" but currentTime freezes (Tesla network freeze).
+const zombieStallMsVisible = 4000;
+const zombieStallMsHidden = 8000;
 // Never hard-reload once we are more than a few seconds into a track.
 const midTrackReloadGuardMs = 4000;
+// Keep-alive health: re-assert Web Audio + silent loop so Tesla cannot age them out.
+const keepAliveHealthMs = 2000;
+// Pause re-assert burst when OS auto-pauses media on minimize.
+const pauseReassertDelaysMs = [0, 50, 120, 300, 700, 1500, 3000, 6000, 12000, 20000];
+// Extra re-play attempts after the page becomes hidden (Tesla often pauses later too).
+const becameHiddenBurstMs = [0, 50, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 60000, 120000];
 
 let playerContainer: HTMLDivElement | null = null;
 let trackEndPollId: number | null = null;
@@ -33,12 +42,18 @@ let hiddenPlayFailCount = 0;
 let lastProgressSampleMs = 0;
 let lastProgressSampleTime = 0;
 let progressHasMoved = false;
+let keepAliveHealthId: number | null = null;
+let keepAliveStateHandler: (() => void) | null = null;
 
-// Silent Web Audio keep-alive: keeps the browser audio pipeline open during
-// cold-load gaps between tracks so Tesla does not hand focus to another app.
+// Dual keep-alive pipeline for Tesla minimized tabs:
+// 1) Near-silent Web Audio oscillator (claims the audio graph)
+// 2) Looping near-silent HTMLAudioElement (claims the media/BT focus path)
+// Either alone can be suspended; together they survive much longer.
 let audioKeepAliveCtx: AudioContext | null = null;
 let audioKeepAliveOsc: OscillatorNode | null = null;
 let audioKeepAliveGain: GainNode | null = null;
+let silentLoopElement: HTMLAudioElement | null = null;
+let silentLoopObjectUrl: string | null = null;
 
 // ======================================================================
 // TYPES
@@ -149,24 +164,24 @@ const setupPlayerElement = (
   });
   element.addEventListener('pause', () => {
     // Tesla (and some Chromium builds) auto-pause media when the browser is
-    // minimized. If the user did not pause, immediately re-assert play.
+    // minimized. If the user did not pause, aggressively re-assert play over
+    // a long window — Tesla often re-pauses several times after hide.
     if (!pausedByUser && element.src && !element.ended) {
       setMediaSessionPlaying();
-      window.setTimeout(() => {
-        if (!pausedByUser && element.paused && element.src && !element.ended) {
-          ensureActivePlayback();
-        }
-      }, 0);
-      window.setTimeout(() => {
-        if (!pausedByUser && element.paused && element.src && !element.ended) {
-          ensureActivePlayback();
-        }
-      }, 100);
-      window.setTimeout(() => {
-        if (!pausedByUser && element.paused && element.src && !element.ended) {
-          ensureActivePlayback();
-        }
-      }, 400);
+      ensureAudioKeepAlive();
+      pauseReassertDelaysMs.forEach((delayMs) => {
+        window.setTimeout(() => {
+          if (pausedByUser) return;
+          const el = getCurrentPlayerElement();
+          if (!el?.src || el.ended) return;
+          if (el.paused || !isElementAudible(el)) {
+            ensureActivePlayback();
+            ensureHiddenLoadRecovery();
+          }
+          ensureAudioKeepAlive();
+          setMediaSessionPlaying();
+        }, delayMs);
+      });
     }
   });
 };
@@ -176,7 +191,7 @@ export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
 };
 
 // ======================================================================
-// AUDIO CONTEXT KEEP-ALIVE
+// AUDIO CONTEXT + SILENT-LOOP KEEP-ALIVE
 // ======================================================================
 
 const getAudioContextCtor = (): typeof AudioContext | null => {
@@ -188,37 +203,169 @@ const getAudioContextCtor = (): typeof AudioContext | null => {
   );
 };
 
-export const ensureAudioKeepAlive = (): void => {
-  if (pausedByUser || typeof window === 'undefined') return;
+/** Tiny mono WAV (~0.25s) with near-zero amplitude — inaudible but not pure digital silence. */
+const buildNearSilentLoopObjectUrl = (): string => {
+  const sampleRate = 8000;
+  const numSamples = 2000; // 0.25s
+  const dataSize = numSamples * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
 
+  const writeStr = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // Extremely quiet 20 Hz-ish content so silence detectors do not drop the stream.
+  for (let i = 0; i < numSamples; i++) {
+    const sample = Math.sin((2 * Math.PI * 20 * i) / sampleRate) * 8; // ~ -72 dBFS
+    view.setInt16(44 + i * 2, sample | 0, true);
+  }
+
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
+};
+
+const bindAudioContextStateHandler = (ctx: AudioContext): void => {
+  if (keepAliveStateHandler) {
+    try {
+      ctx.removeEventListener('statechange', keepAliveStateHandler);
+    } catch {
+      // ignore
+    }
+  }
+  keepAliveStateHandler = () => {
+    if (pausedByUser) return;
+    if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+      void ctx.resume().catch(() => null);
+    }
+  };
+  ctx.addEventListener('statechange', keepAliveStateHandler);
+};
+
+const ensureWebAudioKeepAlive = (): void => {
   const Ctor = getAudioContextCtor();
   if (!Ctor) return;
 
   try {
-    if (!audioKeepAliveCtx) {
+    if (!audioKeepAliveCtx || audioKeepAliveCtx.state === 'closed') {
+      audioKeepAliveOsc = null;
+      audioKeepAliveGain = null;
       audioKeepAliveCtx = new Ctor();
+      bindAudioContextStateHandler(audioKeepAliveCtx);
     }
 
-    if (audioKeepAliveCtx.state === 'suspended') {
-      void audioKeepAliveCtx.resume();
+    if (audioKeepAliveCtx.state === 'suspended' || audioKeepAliveCtx.state === 'interrupted') {
+      void audioKeepAliveCtx.resume().catch(() => null);
     }
 
     if (!audioKeepAliveOsc && audioKeepAliveCtx) {
       audioKeepAliveOsc = audioKeepAliveCtx.createOscillator();
       audioKeepAliveGain = audioKeepAliveCtx.createGain();
       // Near-silent but non-zero so the audio pipeline stays claimed.
-      audioKeepAliveGain.gain.value = 0.0001;
+      audioKeepAliveGain.gain.value = 0.00015;
       audioKeepAliveOsc.frequency.value = 20;
+      audioKeepAliveOsc.type = 'sine';
       audioKeepAliveOsc.connect(audioKeepAliveGain);
       audioKeepAliveGain.connect(audioKeepAliveCtx.destination);
       audioKeepAliveOsc.start();
+    } else if (audioKeepAliveGain && audioKeepAliveCtx) {
+      // Micro-nudge gain so some Chromium builds do not age out a "static" silent graph.
+      const g = audioKeepAliveGain.gain;
+      const now = audioKeepAliveCtx.currentTime;
+      try {
+        g.setValueAtTime(0.00015, now);
+        g.linearRampToValueAtTime(0.0002, now + 0.02);
+        g.linearRampToValueAtTime(0.00015, now + 0.05);
+      } catch {
+        g.value = 0.00015;
+      }
     }
   } catch {
     // AudioContext may be blocked until a user gesture; ignore.
   }
 };
 
+const ensureSilentLoopKeepAlive = (): void => {
+  if (typeof document === 'undefined') return;
+
+  try {
+    if (!silentLoopElement) {
+      if (!silentLoopObjectUrl) {
+        silentLoopObjectUrl = buildNearSilentLoopObjectUrl();
+      }
+      silentLoopElement = document.createElement('audio');
+      silentLoopElement.setAttribute('playsinline', 'true');
+      silentLoopElement.setAttribute('webkit-playsinline', 'true');
+      silentLoopElement.setAttribute('aria-hidden', 'true');
+      silentLoopElement.loop = true;
+      silentLoopElement.preload = 'auto';
+      // Keep independent of user volume; inaudible content only.
+      silentLoopElement.volume = 0.01;
+      silentLoopElement.src = silentLoopObjectUrl;
+
+      if (!playerContainer) {
+        playerContainer = document.createElement('div');
+        playerContainer.id = 'chromatix-player-elements';
+        playerContainer.setAttribute('aria-hidden', 'true');
+        playerContainer.style.cssText =
+          'position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;';
+        document.body.appendChild(playerContainer);
+      }
+      playerContainer.appendChild(silentLoopElement);
+    }
+
+    if (silentLoopElement.paused) {
+      void Promise.resolve(silentLoopElement.play()).catch(() => null);
+    }
+  } catch {
+    // ignore — silent loop is best-effort
+  }
+};
+
+const startKeepAliveHealthWatch = (): void => {
+  if (keepAliveHealthId != null || typeof window === 'undefined') return;
+  keepAliveHealthId = window.setInterval(() => {
+    if (pausedByUser) {
+      stopKeepAliveHealthWatch();
+      return;
+    }
+    ensureWebAudioKeepAlive();
+    ensureSilentLoopKeepAlive();
+  }, keepAliveHealthMs);
+};
+
+const stopKeepAliveHealthWatch = (): void => {
+  if (keepAliveHealthId != null) {
+    window.clearInterval(keepAliveHealthId);
+    keepAliveHealthId = null;
+  }
+};
+
+export const ensureAudioKeepAlive = (): void => {
+  if (pausedByUser || typeof window === 'undefined') return;
+
+  ensureWebAudioKeepAlive();
+  ensureSilentLoopKeepAlive();
+  startKeepAliveHealthWatch();
+};
+
 export const stopAudioKeepAlive = (): void => {
+  stopKeepAliveHealthWatch();
+
   try {
     if (audioKeepAliveOsc) {
       audioKeepAliveOsc.stop();
@@ -232,6 +379,14 @@ export const stopAudioKeepAlive = (): void => {
   } catch {
     // ignore
   }
+  if (audioKeepAliveCtx && keepAliveStateHandler) {
+    try {
+      audioKeepAliveCtx.removeEventListener('statechange', keepAliveStateHandler);
+    } catch {
+      // ignore
+    }
+  }
+  keepAliveStateHandler = null;
   try {
     void audioKeepAliveCtx?.close();
   } catch {
@@ -240,6 +395,26 @@ export const stopAudioKeepAlive = (): void => {
   audioKeepAliveOsc = null;
   audioKeepAliveGain = null;
   audioKeepAliveCtx = null;
+
+  try {
+    if (silentLoopElement) {
+      silentLoopElement.pause();
+      silentLoopElement.removeAttribute('src');
+      silentLoopElement.load();
+      silentLoopElement.remove();
+    }
+  } catch {
+    // ignore
+  }
+  silentLoopElement = null;
+  if (silentLoopObjectUrl) {
+    try {
+      URL.revokeObjectURL(silentLoopObjectUrl);
+    } catch {
+      // ignore
+    }
+    silentLoopObjectUrl = null;
+  }
 };
 
 const samplePlaybackProgress = (element: HTMLAudioElement): void => {
@@ -687,6 +862,18 @@ export const isManualPause = (): boolean => pausedByUser;
 
 export const isPlaybackExpected = (): boolean => !pausedByUser;
 
+const isZombiePlayback = (element: HTMLAudioElement): boolean => {
+  // Element thinks it is playing, but currentTime has not advanced for too long.
+  // Tesla does this when the media pipeline freezes under background throttling.
+  if (element.paused || element.ended || !progressHasMoved) return false;
+  if (lastProgressSampleTime === 0) return false;
+  samplePlaybackProgress(element);
+  if (isElementAtTrackEnd(element)) return false;
+  const isHidden = typeof document !== 'undefined' && document.hidden;
+  const stallMs = isHidden ? zombieStallMsHidden : zombieStallMsVisible;
+  return Date.now() - lastProgressSampleTime >= stallMs;
+};
+
 export const ensureActivePlayback = (): void => {
   if (pausedByUser) return;
 
@@ -706,6 +893,24 @@ export const ensureActivePlayback = (): void => {
     beginPlaybackWhenReady(element, activePlayToken, () =>
       attemptElementPlay(element, activePlayToken, 0, onPlaySuccess)
     );
+    return;
+  }
+
+  // Soft recover frozen "playing" elements without a hard load() mid-track.
+  if (isZombiePlayback(element)) {
+    const onPlaySuccess = () => startTrackEndPolling();
+    // pause()+play() can unstick Tesla's decoder without discarding the buffer.
+    try {
+      element.pause();
+    } catch {
+      // ignore
+    }
+    beginPlaybackWhenReady(element, activePlayToken, () =>
+      attemptElementPlay(element, activePlayToken, 0, onPlaySuccess)
+    );
+    if (typeof document !== 'undefined' && document.hidden) {
+      ensureHiddenLoadRecovery();
+    }
     return;
   }
 
@@ -772,16 +977,28 @@ export const runBackgroundPlaybackTick = (): void => {
   const element = getCurrentPlayerElement();
   if (!element || advanceFired) return;
 
+  ensureAudioKeepAlive();
+
   if (isElementAtTrackEnd(element)) {
     requestTrackAdvance();
     return;
   }
 
-  if (!pausedByUser && element.paused && element.src) {
+  if (pausedByUser || !element.src) return;
+
+  samplePlaybackProgress(element);
+
+  if (element.paused || !isElementAudible(element) || isZombiePlayback(element)) {
     ensureActivePlayback();
+    if (typeof document !== 'undefined' && document.hidden) {
+      ensureHiddenLoadRecovery();
+    }
   }
 
-  ensureAudioKeepAlive();
+  if (typeof document !== 'undefined' && document.hidden) {
+    const durationSec = element.duration || 0;
+    syncHiddenMediaSession(element.currentTime || 0, durationSec > 0 ? durationSec : undefined);
+  }
 };
 
 export const nudgeActivePlayback = (): void => {
@@ -816,13 +1033,14 @@ export const handleBecameHidden = (): void => {
     return;
   }
 
-  if (element.paused || !isElementAudible(element)) {
+  if (element.paused || !isElementAudible(element) || isZombiePlayback(element)) {
     ensureActivePlayback();
     ensureHiddenLoadRecovery();
   }
 
-  // Burst of re-play attempts — Tesla often pauses a few hundred ms after hide.
-  [50, 200, 500, 1000, 2000, 4000].forEach((delayMs) => {
+  // Long burst of re-play attempts — Tesla often pauses right after hide and
+  // again after tens of seconds when background throttling kicks in harder.
+  becameHiddenBurstMs.forEach((delayMs) => {
     window.setTimeout(() => {
       if (pausedByUser) return;
       const el = getCurrentPlayerElement();
@@ -831,7 +1049,7 @@ export const handleBecameHidden = (): void => {
         requestTrackAdvance();
         return;
       }
-      if (el.paused || !isElementAudible(el)) {
+      if (el.paused || !isElementAudible(el) || isZombiePlayback(el)) {
         ensureActivePlayback();
         ensureHiddenLoadRecovery();
       }

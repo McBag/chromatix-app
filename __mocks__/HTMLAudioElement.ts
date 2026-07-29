@@ -8,6 +8,7 @@ export class MockHTMLAudioElement {
   readyState = 4; // HTMLMediaElement.HAVE_ENOUGH_DATA
   preload = 'auto';
   paused = true;
+  loop = false;
 
   private eventListeners: { [key: string]: Function[] } = {};
   private attributes: { [key: string]: string } = {};
@@ -70,6 +71,10 @@ export class MockHTMLAudioElement {
         }, 100);
       }, 100);
     }, 50);
+  }
+
+  remove() {
+    // no-op for jsdom/tests
   }
 
   private triggerEvent(eventName: string) {
