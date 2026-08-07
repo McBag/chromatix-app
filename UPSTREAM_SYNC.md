@@ -23,8 +23,9 @@ git remote -v
     0.66.0
       └── Tesla customizations   (commit on top of 0.66.0)
             └── Merge 0.67.0
-                  └── Merge 0.68.0        (current main)
-                        └── later merges…
+                  └── Merge 0.68.0
+                        └── Merge 0.70.0  (current main)
+                              └── later merges…
 ```
 
 Backup of the pre-rebuild single commit: branch `backup/pre-upstream-rebuild`.
@@ -38,12 +39,12 @@ Backup of the pre-rebuild single commit: branch `backup/pre-upstream-rebuild`.
 git fetch upstream --tags
 
 # 2. See what landed
-git log --oneline HEAD..0.68.0   # example tag
-git diff --stat HEAD...0.68.0
+git log --oneline HEAD..0.70.0   # example tag
+git diff --stat HEAD...0.70.0
 
 # 3. Merge the release tag into main
 git checkout main
-git merge 0.68.0 -m "Merge upstream Chromatix 0.68.0 into Tesla fork"
+git merge 0.70.0 -m "Merge upstream Chromatix 0.70.0 into Tesla fork"
 
 # 4. Resolve conflicts (typical hotspots)
 #    - ControlBar (Tesla layout vs stock)

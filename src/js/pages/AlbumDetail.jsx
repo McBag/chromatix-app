@@ -76,33 +76,35 @@ const AlbumDetail = () => {
   const isLoaded = playingVariant === 'albums' && playingAlbumId === albumId;
   const isPlaying = isLoaded && playerPlaying;
 
+  const titleBlock = (
+    <Title
+      albumArtist={albumArtist}
+      albumArtistLink={albumArtistLink}
+      albumDurationString={albumDurationString}
+      albumId={albumId}
+      albumIsFavourite={albumIsFavourite}
+      albumRating={albumRating}
+      albumReleaseDate={albumReleaseDate}
+      albumThumb={albumThumb}
+      albumThumbMedium={albumThumbMedium}
+      albumTitle={albumTitle}
+      albumTrackCount={albumTrackCount}
+      albumTracks={albumTracks}
+      colOptions={colOptions}
+      doPlay={doPlay}
+      doQueue={doQueue}
+      isListView={isListView}
+      isLoaded={isLoaded}
+      isPlaying={isPlaying}
+      libraryId={libraryId}
+      platformOpts={platformOpts}
+      setColumnVisibility={setColumnVisibility}
+    />
+  );
+
   return (
     <>
-      {(isLoading || isEmptyList) && (
-        <Title
-          albumArtist={albumArtist}
-          albumArtistLink={albumArtistLink}
-          albumDurationString={albumDurationString}
-          albumId={albumId}
-          albumIsFavourite={albumIsFavourite}
-          albumRating={albumRating}
-          albumReleaseDate={albumReleaseDate}
-          albumThumb={albumThumb}
-          albumThumbMedium={albumThumbMedium}
-          albumTitle={albumTitle}
-          albumTrackCount={albumTrackCount}
-          albumTracks={albumTracks}
-          colOptions={colOptions}
-          doPlay={doPlay}
-          doQueue={doQueue}
-          isListView={isListView}
-          isLoaded={isLoaded}
-          isPlaying={isPlaying}
-          libraryId={libraryId}
-          platformOpts={platformOpts}
-          setColumnVisibility={setColumnVisibility}
-        />
-      )}
+      {(isLoading || isEmptyList) && titleBlock}
       {isLoading && <Loading forceVisible inline showOffline />}
       {isListView && (
         <ViewList
@@ -114,29 +116,7 @@ const AlbumDetail = () => {
           sortString={albumSortString}
           colOptions={colOptions}
         >
-          <Title
-            albumArtist={albumArtist}
-            albumArtistLink={albumArtistLink}
-            albumDurationString={albumDurationString}
-            albumId={albumId}
-            albumIsFavourite={albumIsFavourite}
-            albumRating={albumRating}
-            albumReleaseDate={albumReleaseDate}
-            albumThumb={albumThumb}
-            albumThumbMedium={albumThumbMedium}
-            albumTitle={albumTitle}
-            albumTrackCount={albumTrackCount}
-            albumTracks={albumTracks}
-            colOptions={colOptions}
-            doPlay={doPlay}
-            doQueue={doQueue}
-            isListView={isListView}
-            isLoaded={isLoaded}
-            isPlaying={isPlaying}
-            libraryId={libraryId}
-            setColumnVisibility={setColumnVisibility}
-            platformOpts={platformOpts}
-          />
+          {titleBlock}
         </ViewList>
       )}
     </>
@@ -166,7 +146,7 @@ const Title = ({
   platformOpts,
   setColumnVisibility,
 }) => {
-  const contextEntries = useContextMenuAlbums({ albumId, artistLink: albumArtistLink });
+  const contextEntries = useContextMenuAlbums({ albumId, artistLink: albumArtistLink }, { showPlay: false });
 
   return (
     <TitleHeading

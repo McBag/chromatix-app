@@ -1,8 +1,8 @@
-# Chromatix Tesla Customizations — Version 0.68.0 (Vite)
+# Chromatix Tesla Customizations — Version 0.70.0 (Vite)
 
-**Base version:** Chromatix `0.68.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.68.0`  
-**Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0` and `0.68.0`  
-**Last updated:** 2026-07-29 (keep-alive v2: dual Web Audio + silent-loop, zombie stall recovery, longer hide re-assert up to 2 min, worker timeout-chain)  
+**Base version:** Chromatix `0.70.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.70.0`  
+**Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0`, `0.68.0`, and `0.70.0`  
+**Last updated:** 2026-08-07 (upstream merge 0.70.0; keep-alive v2 preserved)  
 **Build system:** Vite 8 + Rolldown (upstream) — **not** CRA  
 **Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)  
 **Routine upgrades:** see **`UPSTREAM_SYNC.md`** (git merge workflow)
@@ -20,14 +20,14 @@ This document describes all Tesla customizations applied on top of stock Chromat
 
 ## What changed vs. older guides
 
-| Topic         | 0.59.0 Cursor (CRA)                 | 0.66.0 this tree (Vite)                                          |
+| Topic | 0.59.0 Cursor (CRA) | 0.66.0 this tree (Vite) |
 | ------------- | ----------------------------------- | ---------------------------------------------------------------- | --- | ------ |
-| Bundler       | Create React App                    | Vite 8                                                           |
-| Env vars      | `REACT_APP_*` / `process.env`       | `VITE_*` / `import.meta.env`                                     |
-| Build         | `npm run build:win` → CRA `static/` | `npm run build:win` → Vite + **finalize to CRA layout**          |
-| Output        | `build/static/js/main.*.js`         | Same layout after finalize: `static/js                           | css | media` |
-| Player router | Native only in Cursor fork          | `player.ts` routes native + DASH; Tesla keep-alive on **native** |
-| Settings home | `SettingsGeneral` playback block    | `SettingsPlayback` (0.66 split)                                  |
+| Bundler | Create React App | Vite 8 |
+| Env vars | `REACT_APP_*` / `process.env` | `VITE_*` / `import.meta.env` |
+| Build | `npm run build:win` → CRA `static/` | `npm run build:win` → Vite + **finalize to CRA layout** |
+| Output | `build/static/js/main.*.js` | Same layout after finalize: `static/js                           | css | media` |
+| Player router | Native only in Cursor fork | `player.ts` routes native + DASH; Tesla keep-alive on **native** |
+| Settings home | `SettingsGeneral` playback block | `SettingsPlayback` (0.66 split) |
 
 ---
 

@@ -62,6 +62,9 @@ export default defineConfig({
           if (id.includes('node_modules/@radix-ui/')) {
             return 'radix';
           }
+          if (id.includes('node_modules/dashjs/')) {
+            return 'dashjs';
+          }
         },
       },
     },
