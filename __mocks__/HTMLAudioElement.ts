@@ -9,6 +9,7 @@ export class MockHTMLAudioElement {
   preload = 'auto';
   paused = true;
   loop = false;
+  ended = false;
 
   private eventListeners: { [key: string]: Function[] } = {};
   private attributes: { [key: string]: string } = {};

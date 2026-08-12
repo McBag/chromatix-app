@@ -362,6 +362,43 @@ describe('Player Service', () => {
       expect(elementA().src).toBe('http://example.com/track3.mp3');
     });
 
+    test('setNextTrack preloads the next src on a standby element', () => {
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+      const preloaded = createdElements.find((el) => el.src === 'http://example.com/track2.mp3');
+      expect(preloaded).toBeTruthy();
+      expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track1.mp3');
+    });
+
+    test('loadTrack adopts a preloaded standby element instead of reusing the first src', () => {
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+      const first = player.getCurrentPlayerElement();
+      player.loadTrack('http://example.com/track2.mp3');
+      const current = player.getCurrentPlayerElement();
+      expect(current).not.toBe(first);
+      expect(current?.src).toBe('http://example.com/track2.mp3');
+      expect(first?.paused).toBe(true);
+    });
+
+    test('maybeWarmStartNext hands off before track end while hidden', async () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      const current = player.getCurrentPlayerElement();
+      if (current) current.currentTime = 98;
+
+      player.maybeWarmStartNext();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track2.mp3');
+      expect(mockCallbacks.onEnded).toHaveBeenCalled();
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    });
+
     test('getCurrentProgress() returns 0 after unload', () => {
       player.loadTrack('http://example.com/track1.mp3');
       player.setProgress(30000);

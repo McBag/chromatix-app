@@ -92,6 +92,7 @@ export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolea
     // Preserve silent Web Audio keep-alive across the native→DASH handoff so
     // Tesla does not drop Bluetooth focus while the DASH manifest loads.
     nativeX.unload({ preserveKeepAlive: true });
+    nativeX.setNextTrack(null);
     if (play) nativeX.ensureAudioKeepAlive();
     dashX.loadTrack(track.dashSrc, progress, play);
     activePlayer = 'dash';
@@ -110,6 +111,33 @@ export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolea
     activePlayer = 'native';
   }
   return true;
+};
+
+export const setNextTrack = (track: PlayerTrack | string | null): void => {
+  if (!track) {
+    nativeX.setNextTrack(null);
+    return;
+  }
+  if (typeof track === 'string') {
+    nativeX.setNextTrack(track);
+    return;
+  }
+  const transcoding = requiresTranscoding(track.codec);
+  if (transcoding && track.dashSrc && dashX.isSupported()) {
+    // Next item needs DASH — native standby cannot preload it.
+    nativeX.setNextTrack(null);
+    return;
+  }
+  if (track.src) {
+    nativeX.setNextTrack(track.src);
+  } else {
+    nativeX.setNextTrack(null);
+  }
+};
+
+export const maybeWarmStartNext = (): void => {
+  if (activePlayer !== 'native') return;
+  nativeX.maybeWarmStartNext();
 };
 
 // ======================================================================
@@ -307,8 +335,9 @@ export const handleBecameHidden = (): void => {
 };
 
 // ======================================================================
-// PRELOADING STUBS
-// [NOTE] Intentionally unused — Tesla build uses a single active audio element.
+// NEXT-TRACK PRELOAD
+// Native A/B handoff: buffer the next src on a standby <audio> and start it
+// before the current track ends while the Tesla tab is minimized.
 // ======================================================================
 
 // ======================================================================

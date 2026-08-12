@@ -9,7 +9,7 @@
 
 This document describes all Tesla customizations applied on top of stock Chromatix. Prefer git merge (`UPSTREAM_SYNC.md`) over full re-apply; use this file when conflicts need intent.
 
-**Fork philosophy:** This tree is a Tesla-optimized Chromatix build. All former Tesla-only behavior (playback keep-alive, MediaSession sync, touch sizing, card controls) is the **default everywhere** — there is **no** `navigator.userAgent` Tesla detection and **no** `html[data-is-tesla]` attribute at runtime. **No next-track preload** — a single active audio path is preferred (native player keep-alive; DASH still routed via `player.ts` when needed).
+**Fork philosophy:** This tree is a Tesla-optimized Chromatix build. All former Tesla-only behavior (playback keep-alive, MediaSession sync, touch sizing, card controls) is the **default everywhere** — there is **no** `navigator.userAgent` Tesla detection and **no** `html[data-is-tesla]` attribute at runtime. Native playback **preloads the next track** on a standby `<audio>` and, while the tab is hidden, starts it before the current track ends so Tesla does not freeze JS on `ended` (DASH still routed via `player.ts` when needed).
 
 **Explicitly not applied (and reverted if tried):**
 
@@ -94,17 +94,17 @@ npx serve -s build -l 4173
 
 ### Files
 
-| File                                   | Changes                                                                                                                                                                                                          |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/js/services/player.native.ts`     | Single attached `<audio>`, track-end polling, hidden stall + **zombie** recovery, **dual keep-alive** (Web Audio oscillator + looping near-silent `<audio>`), MediaSession helpers, long hide re-assert (≤2 min) |
-| `src/js/services/player.ts`            | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native                                            |
-| `src/js/store/models.player.js`        | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload                                       |
-| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; Worker + main interval + cascading timeout when hidden; recovery bursts to 2 min; wall-clock end fallback; **no** pause/unload on hide                                                                |
-| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                                          |
-| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                                                 |
-| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden                                                                                                                                                                         |
-| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                                                 |
-| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                                     |
+| File                                   | Changes                                                                                                                                                                                                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/js/services/player.native.ts`     | Active + standby `<audio>`, next-track preload, hidden early handoff, track-end polling, hidden stall + **zombie** recovery, **dual keep-alive** (Web Audio oscillator + looping near-silent `<audio>`), MediaSession helpers, long hide re-assert (≤2 min) |
+| `src/js/services/player.ts`            | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native                                                                                       |
+| `src/js/store/models.player.js`        | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload                                                                                  |
+| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; Worker + main interval + cascading timeout when hidden; recovery bursts to 2 min; wall-clock end fallback; **no** pause/unload on hide                                                                                                           |
+| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                                                                                     |
+| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                                                                                            |
+| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden                                                                                                                                                                                                                    |
+| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                                                                                            |
+| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                                                                                |
 
 ### Behavior notes
 

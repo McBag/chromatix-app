@@ -107,6 +107,9 @@ const usePlaybackKeepAlive = (): null => {
 
       // Kick adjacent-album prefetch on every track change while autoplay is on
       // (covers Tesla where setTimeout from load handlers was throttled away).
+      if (playerPlaying && !manualPause) {
+        dispatch.playerModel.updateNextTrack();
+      }
       if (playerPlaying && !manualPause && autoPlayPreviousAlbumOnAlbumEnd && !adjacentAlbumPrefetched) {
         window.setTimeout(() => dispatch.playerModel.prefetchAdjacentAlbum(), 0);
       }
@@ -132,6 +135,7 @@ const usePlaybackKeepAlive = (): null => {
 
       playerX.runBackgroundPlaybackTick();
       playerX.ensureAudioKeepAlive();
+      playerX.maybeWarmStartNext();
 
       const trackKey = playingTrackKeys?.[playingTrackIndex];
       const currentTrack = trackKey != null ? playingTrackList?.[trackKey] : null;

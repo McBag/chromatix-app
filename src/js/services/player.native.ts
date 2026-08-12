@@ -28,6 +28,10 @@ const keepAliveHealthMs = 2000;
 const pauseReassertDelaysMs = [0, 50, 120, 300, 700, 1500, 3000, 6000, 12000, 20000];
 // Extra re-play attempts after the page becomes hidden (Tesla often pauses later too).
 const becameHiddenBurstMs = [0, 50, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 60000, 120000];
+// Hidden Tesla tabs often freeze JS the moment the current <audio> ends.
+// Start the already-buffered next track before that, then swap elements.
+const hiddenHandoffRemainingMs = 2500;
+const hiddenLoopGuardRemainingMs = 4000;
 
 let playerContainer: HTMLDivElement | null = null;
 let trackEndPollId: number | null = null;
@@ -44,6 +48,14 @@ let lastProgressSampleTime = 0;
 let progressHasMoved = false;
 let keepAliveHealthId: number | null = null;
 let keepAliveStateHandler: (() => void) | null = null;
+let standbyElement: HTMLAudioElement | null = null;
+let nextTrackSrc: string | null = null;
+let preloadedSrc: string | null = null;
+let warmStartActive = false;
+let lastKnownCurrentTime = 0;
+let onLoadStartCb: () => void = () => undefined;
+let onCanPlayCb: () => void = () => undefined;
+let onErrorCb: (params: { event: Event; playerElement: HTMLAudioElement }) => void = () => undefined;
 
 // Dual keep-alive pipeline for Tesla minimized tabs:
 // 1) Near-silent Web Audio oscillator (claims the audio graph)
@@ -83,16 +95,18 @@ export const init = ({
   onError,
 }: PlayerInitParams): void => {
   console.log('%c--- player - init ---', 'color:#a18507');
+  onLoadStartCb = onLoadStart;
+  onCanPlayCb = onCanPlay;
+  onErrorCb = onError;
   if (!playerElement) {
     playerElement = document.createElement('audio');
-    setupPlayerElement(playerElement, volumeLevel, volumeMuted, onLoadStart, onCanPlay, onError);
-    appendPlayerElement();
+    setupPlayerElement(playerElement, volumeLevel, volumeMuted);
+    appendPlayerElement(playerElement);
   }
 };
 
-const appendPlayerElement = (): void => {
-  if (!playerElement) return;
-
+const ensurePlayerContainer = (): HTMLDivElement | null => {
+  if (typeof document === 'undefined') return null;
   if (!playerContainer) {
     playerContainer = document.createElement('div');
     playerContainer.id = 'chromatix-player-elements';
@@ -100,64 +114,70 @@ const appendPlayerElement = (): void => {
     playerContainer.style.cssText = 'position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;';
     document.body.appendChild(playerContainer);
   }
+  return playerContainer;
+};
 
-  playerElement.setAttribute('playsinline', 'true');
-  playerElement.setAttribute('webkit-playsinline', 'true');
+const appendPlayerElement = (element: HTMLAudioElement | null): void => {
+  if (!element) return;
+
+  const container = ensurePlayerContainer();
+  if (!container) return;
+
+  element.setAttribute('playsinline', 'true');
+  element.setAttribute('webkit-playsinline', 'true');
   // Hint to Chromium/Tesla that this element is intentional media, not an ad.
-  playerElement.setAttribute('controlslist', 'nodownload noplaybackrate');
-  if (
-    playerElement.parentNode !== playerContainer &&
-    playerContainer instanceof Node &&
-    playerElement instanceof Node
-  ) {
-    playerContainer.appendChild(playerElement);
+  element.setAttribute('controlslist', 'nodownload noplaybackrate');
+  if (element.parentNode !== container && container instanceof Node && element instanceof Node) {
+    container.appendChild(element);
   }
 };
 
-const setupPlayerElement = (
-  element: HTMLAudioElement,
-  volumeLevel: number,
-  volumeMuted: boolean,
-  onLoadStart: () => void,
-  onCanPlay: () => void,
-  onError: (params: { event: Event; playerElement: HTMLAudioElement }) => void
-): void => {
+const isActivePlayer = (element: HTMLAudioElement): boolean => element === playerElement;
+
+const setupPlayerElement = (element: HTMLAudioElement, volumeLevel: number, volumeMuted: boolean): void => {
   element.pause();
   element.volume = volumeMuted ? 0 : volumeLevel / 100;
   element.preload = 'auto';
 
-  element.addEventListener('loadstart', onLoadStart);
-  element.addEventListener('canplay', onCanPlay);
+  element.addEventListener('loadstart', () => {
+    if (isActivePlayer(element)) onLoadStartCb();
+  });
+  element.addEventListener('canplay', () => {
+    if (isActivePlayer(element)) onCanPlayCb();
+  });
   element.addEventListener('ended', () => {
+    if (!isActivePlayer(element)) return;
     requestTrackAdvance();
   });
-  element.addEventListener('error', (event: Event) => onError({ event, playerElement: element }));
+  element.addEventListener('error', (event: Event) => {
+    if (!isActivePlayer(element)) return;
+    onErrorCb({ event, playerElement: element });
+  });
   element.addEventListener('playing', () => {
-    if (!pausedByUser) {
-      stopHiddenLoadRecovery();
-      ensureAudioKeepAlive();
-      if (!trackEndPollId) {
-        startTrackEndPolling();
-      }
+    if (!isActivePlayer(element) || pausedByUser) return;
+    stopHiddenLoadRecovery();
+    ensureAudioKeepAlive();
+    if (!trackEndPollId) {
+      startTrackEndPolling();
     }
   });
   element.addEventListener('stalled', () => {
-    if (!pausedByUser) {
+    if (isActivePlayer(element) && !pausedByUser) {
       ensureHiddenLoadRecovery();
     }
   });
   element.addEventListener('waiting', () => {
-    if (!pausedByUser) {
+    if (isActivePlayer(element) && !pausedByUser) {
       ensureHiddenLoadRecovery();
     }
   });
   element.addEventListener('suspend', () => {
-    if (!pausedByUser) {
+    if (isActivePlayer(element) && !pausedByUser) {
       ensureHiddenLoadRecovery();
     }
   });
   element.addEventListener('emptied', () => {
-    if (!pausedByUser) {
+    if (isActivePlayer(element) && !pausedByUser) {
       // After src swap or internal reset, re-arm recovery in background
       ensureHiddenLoadRecovery();
     }
@@ -166,28 +186,220 @@ const setupPlayerElement = (
     // Tesla (and some Chromium builds) auto-pause media when the browser is
     // minimized. If the user did not pause, aggressively re-assert play over
     // a long window — Tesla often re-pauses several times after hide.
-    if (!pausedByUser && element.src && !element.ended) {
-      setMediaSessionPlaying();
-      ensureAudioKeepAlive();
-      pauseReassertDelaysMs.forEach((delayMs) => {
-        window.setTimeout(() => {
-          if (pausedByUser) return;
-          const el = getCurrentPlayerElement();
-          if (!el?.src || el.ended) return;
-          if (el.paused || !isElementAudible(el)) {
-            ensureActivePlayback();
-            ensureHiddenLoadRecovery();
-          }
-          ensureAudioKeepAlive();
-          setMediaSessionPlaying();
-        }, delayMs);
-      });
-    }
+    if (!isActivePlayer(element) || pausedByUser || !element.src || element.ended) return;
+    setMediaSessionPlaying();
+    ensureAudioKeepAlive();
+    pauseReassertDelaysMs.forEach((delayMs) => {
+      window.setTimeout(() => {
+        if (pausedByUser) return;
+        const el = getCurrentPlayerElement();
+        if (!el?.src || el.ended) return;
+        if (el.paused || !isElementAudible(el)) {
+          ensureActivePlayback();
+          ensureHiddenLoadRecovery();
+        }
+        ensureAudioKeepAlive();
+        setMediaSessionPlaying();
+      }, delayMs);
+    });
   });
 };
 
 export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
   return playerElement;
+};
+
+const sameSrc = (a: string | null | undefined, b: string | null | undefined): boolean => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  try {
+    const base = typeof location !== 'undefined' ? location.href : 'http://localhost/';
+    return new URL(a, base).href === new URL(b, base).href;
+  } catch {
+    return false;
+  }
+};
+
+const ensureStandbyElement = (): HTMLAudioElement | null => {
+  if (typeof document === 'undefined') return null;
+  if (!standbyElement) {
+    standbyElement = document.createElement('audio');
+    const volume = playerElement?.volume ?? 1;
+    setupPlayerElement(standbyElement, volume * 100, volume === 0);
+    if (playerElement) {
+      standbyElement.volume = playerElement.volume;
+    }
+    appendPlayerElement(standbyElement);
+  }
+  return standbyElement;
+};
+
+const swapToStandby = (): boolean => {
+  if (!standbyElement) return false;
+  const prev = playerElement;
+  playerElement = standbyElement;
+  standbyElement = prev;
+  warmStartActive = false;
+  preloadedSrc = null;
+  lastKnownCurrentTime = 0;
+  lastProgressSampleMs = 0;
+  lastProgressSampleTime = 0;
+  progressHasMoved = false;
+  if (prev) {
+    try {
+      prev.loop = false;
+      prev.pause();
+    } catch {
+      // ignore
+    }
+  }
+  return true;
+};
+
+const isStandbyReadyFor = (trackSrc: string): boolean => {
+  if (!standbyElement || !sameSrc(standbyElement.src, trackSrc)) return false;
+  return standbyElement.readyState >= HAVE_CURRENT_DATA;
+};
+
+const tryAdoptStandby = (trackSrc: string, progress: number, play: boolean, playToken: number): boolean => {
+  if (!isStandbyReadyFor(trackSrc)) return false;
+
+  if (!swapToStandby() || !playerElement) return false;
+
+  if (progress) {
+    playerElement.currentTime = progress / 1000;
+  }
+
+  if (play) {
+    playWhenReady(playerElement, playToken);
+    startHiddenLoadRecovery(playToken);
+    if (typeof document !== 'undefined' && document.hidden) {
+      attemptElementPlay(playerElement, playToken, 0, () => {
+        if (!trackEndPollId) startTrackEndPolling();
+      });
+    }
+  } else {
+    stopTrackEndPolling();
+    try {
+      playerElement.pause();
+    } catch {
+      // ignore
+    }
+  }
+  return true;
+};
+
+const remainingMsOf = (element: HTMLAudioElement | null): number => {
+  if (!element) return Number.POSITIVE_INFINITY;
+  const durationSec = element.duration;
+  if (!durationSec || durationSec <= 0 || Number.isNaN(durationSec)) return Number.POSITIVE_INFINITY;
+  return (durationSec - element.currentTime) * 1000;
+};
+
+const completeHiddenHandoff = (): boolean => {
+  if (pausedByUser || !nextTrackSrc || !isStandbyReadyFor(nextTrackSrc)) return false;
+  if (playerElement && sameSrc(playerElement.src, nextTrackSrc) && !playerElement.ended) return false;
+
+  const finish = (): void => {
+    if (!swapToStandby()) return;
+    setMediaSessionPlaying();
+    ensureAudioKeepAlive();
+    startTrackEndPolling();
+    requestTrackAdvance();
+  };
+
+  warmStartActive = true;
+  setMediaSessionPlaying();
+  ensureAudioKeepAlive();
+
+  if (standbyElement && !standbyElement.paused && !standbyElement.ended) {
+    finish();
+    return true;
+  }
+
+  if (!standbyElement) {
+    warmStartActive = false;
+    return false;
+  }
+
+  Promise.resolve(standbyElement.play())
+    .then(() => {
+      if (pausedByUser) {
+        warmStartActive = false;
+        return;
+      }
+      finish();
+    })
+    .catch(() => {
+      warmStartActive = false;
+    });
+  return true;
+};
+
+export const setNextTrack = (trackSrc: string | null): void => {
+  nextTrackSrc = trackSrc;
+  if (!trackSrc) {
+    preloadedSrc = null;
+    if (standbyElement && standbyElement.paused) {
+      try {
+        standbyElement.removeAttribute('src');
+        standbyElement.load();
+      } catch {
+        // ignore
+      }
+    }
+    return;
+  }
+
+  if (sameSrc(preloadedSrc, trackSrc) || sameSrc(standbyElement?.src, trackSrc)) return;
+
+  const standby = ensureStandbyElement();
+  if (!standby) return;
+
+  preloadedSrc = trackSrc;
+  standby.src = trackSrc;
+  standby.load();
+};
+
+export const maybeWarmStartNext = (): void => {
+  if (pausedByUser || !nextTrackSrc || !playerElement) return;
+  if (sameSrc(playerElement.src, nextTrackSrc) && !playerElement.ended) return;
+
+  const remaining = remainingMsOf(playerElement);
+  const isHidden = typeof document !== 'undefined' && document.hidden;
+  const standbyReady = isStandbyReadyFor(nextTrackSrc);
+
+  if (isHidden && remaining <= hiddenLoopGuardRemainingMs && remaining > 0 && !standbyReady) {
+    playerElement.loop = true;
+  }
+
+  const nearPreviousEnd =
+    lastKnownCurrentTime > 0 && playerElement.duration > 0 && lastKnownCurrentTime > playerElement.duration - 3;
+  const wrapped = Boolean(playerElement.loop && nearPreviousEnd && playerElement.currentTime < 3);
+
+  lastKnownCurrentTime = playerElement.currentTime || 0;
+
+  if (wrapped) {
+    playerElement.loop = false;
+    if (standbyReady) {
+      completeHiddenHandoff();
+    } else {
+      requestTrackAdvance();
+    }
+    return;
+  }
+
+  if (!standbyReady) {
+    if (nextTrackSrc && !sameSrc(standbyElement?.src, nextTrackSrc)) {
+      setNextTrack(nextTrackSrc);
+    }
+    return;
+  }
+
+  if (isHidden && remaining <= hiddenHandoffRemainingMs) {
+    if (warmStartActive) return;
+    completeHiddenHandoff();
+  }
 };
 
 // ======================================================================
@@ -317,15 +529,10 @@ const ensureSilentLoopKeepAlive = (): void => {
       silentLoopElement.volume = 0.01;
       silentLoopElement.src = silentLoopObjectUrl;
 
-      if (!playerContainer) {
-        playerContainer = document.createElement('div');
-        playerContainer.id = 'chromatix-player-elements';
-        playerContainer.setAttribute('aria-hidden', 'true');
-        playerContainer.style.cssText =
-          'position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;';
-        document.body.appendChild(playerContainer);
+      const container = ensurePlayerContainer();
+      if (container && silentLoopElement.parentNode !== container) {
+        container.appendChild(silentLoopElement);
       }
-      playerContainer.appendChild(silentLoopElement);
     }
 
     if (silentLoopElement.paused) {
@@ -581,10 +788,21 @@ export const unload = (opts?: { preserveKeepAlive?: boolean }): void => {
     stopAudioKeepAlive();
   }
   if (playerElement) {
+    playerElement.loop = false;
     playerElement.pause();
     playerElement.src = '';
     playerElement.load();
   }
+  if (standbyElement) {
+    standbyElement.loop = false;
+    standbyElement.pause();
+    standbyElement.src = '';
+    standbyElement.load();
+  }
+  nextTrackSrc = null;
+  preloadedSrc = null;
+  warmStartActive = false;
+  lastKnownCurrentTime = 0;
   advanceFired = false;
   hiddenPlayFailCount = 0;
   stopTrackEndPolling();
@@ -791,11 +1009,39 @@ export const loadTrack = (trackSrc: string, progress: number = 0, play: boolean 
   lastProgressSampleMs = 0;
   lastProgressSampleTime = 0;
   progressHasMoved = false;
+  lastKnownCurrentTime = 0;
+  warmStartActive = false;
   const playToken = ++activePlayToken;
 
   if (play) {
     setMediaSessionPlaying();
     ensureAudioKeepAlive();
+  }
+
+  if (playerElement) {
+    playerElement.loop = false;
+  }
+
+  // Warm handoff already swapped to this src — do not reload or we create a gap.
+  if (playerElement && sameSrc(playerElement.src, trackSrc) && !playerElement.ended) {
+    if (progress) {
+      playerElement.currentTime = progress / 1000;
+    }
+    if (play) {
+      if (playerElement.paused) {
+        playWhenReady(playerElement, playToken);
+        startHiddenLoadRecovery(playToken);
+      } else if (!trackEndPollId) {
+        startTrackEndPolling();
+      }
+    } else {
+      stopTrackEndPolling();
+    }
+    return;
+  }
+
+  if (tryAdoptStandby(trackSrc, progress, play, playToken)) {
+    return;
   }
 
   if (playerElement) {
@@ -825,11 +1071,16 @@ export const loadTrack = (trackSrc: string, progress: number = 0, play: boolean 
 
 export const pause = (): void => {
   pausedByUser = true;
+  warmStartActive = false;
   stopHiddenLoadRecovery();
   stopTrackEndPolling();
   stopAudioKeepAlive();
   if (playerElement) {
+    playerElement.loop = false;
     playerElement.pause();
+  }
+  if (standbyElement) {
+    standbyElement.pause();
   }
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = 'paused';
@@ -931,6 +1182,9 @@ export const setVolume = (volumeLevel: number): void => {
   if (playerElement) {
     playerElement.volume = volume;
   }
+  if (standbyElement) {
+    standbyElement.volume = volume;
+  }
 };
 
 export const setProgress = (progress: number): void => {
@@ -953,6 +1207,8 @@ const startTrackEndPolling = (): void => {
   trackEndPollId = window.setInterval(() => {
     const element = getCurrentPlayerElement();
     if (!element || advanceFired) return;
+
+    maybeWarmStartNext();
 
     // Also check when paused: Tesla may leave the element paused at track end.
     if (isElementAtTrackEnd(element)) {
@@ -978,6 +1234,7 @@ export const runBackgroundPlaybackTick = (): void => {
   if (!element || advanceFired) return;
 
   ensureAudioKeepAlive();
+  maybeWarmStartNext();
 
   if (isElementAtTrackEnd(element)) {
     requestTrackAdvance();
@@ -1024,6 +1281,7 @@ export const handleBecameHidden = (): void => {
 
   ensureAudioKeepAlive();
   setMediaSessionPlaying();
+  maybeWarmStartNext();
 
   const element = getCurrentPlayerElement();
   if (!element?.src) return;

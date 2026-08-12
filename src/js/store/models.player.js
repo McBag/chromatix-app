@@ -689,6 +689,7 @@ const effects = (dispatch) => ({
     teslaSetMetadataFromTrack(currentTrack);
     playerX.loadTrack(withDashSrc(currentTrack, currentService, serverBaseUrl, userToken, sessionId));
     playerX.nudgeActivePlayback();
+    dispatch.playerModel.updateNextTrack();
 
     dispatch.playerModel.setPlayerState({
       playerInteractionCount: rootState.playerModel.playerInteractionCount + 1,
@@ -756,6 +757,7 @@ const effects = (dispatch) => ({
         } else if (play) {
           playerX.nudgeActivePlayback();
         }
+        dispatch.playerModel.updateNextTrack();
 
         // log playback state to server
         if (play && trackLoaded) {
@@ -1011,8 +1013,43 @@ const effects = (dispatch) => ({
   },
 
   updateNextTrack(payload, rootState) {
-    // Intentionally no-op: Tesla build uses a single active <audio> element
-    // without next-track preload.
+    const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
+    const playingTrackCount = rootState.sessionModel.playingTrackCount;
+    const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
+    const playingTrackList = rootState.sessionModel.playingTrackList;
+    const playingRepeatAll = rootState.sessionModel.playingRepeatAll;
+    const playingRepeatOnce = rootState.sessionModel.playingRepeatOnce;
+
+    if (playingTrackIndex == null || !playingTrackKeys || !playingTrackList) {
+      playerX.setNextTrack(null);
+      return;
+    }
+
+    let nextIndex = null;
+    if (playingRepeatOnce) {
+      nextIndex = playingTrackIndex;
+    } else if (playingTrackCount != null && playingTrackIndex < playingTrackCount - 1) {
+      nextIndex = playingTrackIndex + 1;
+    } else if (playingRepeatAll) {
+      nextIndex = 0;
+    }
+
+    if (nextIndex == null) {
+      playerX.setNextTrack(null);
+      return;
+    }
+
+    const nextTrack = playingTrackList[playingTrackKeys[nextIndex]];
+    if (!nextTrack?.src) {
+      playerX.setNextTrack(null);
+      return;
+    }
+
+    const currentService = rootState.appModel.currentService;
+    const serverBaseUrl = rootState.appModel.serverBaseUrl;
+    const userToken = rootState.appModel.userToken;
+    const sessionId = rootState.sessionModel.sessionId;
+    playerX.setNextTrack(withDashSrc(nextTrack, currentService, serverBaseUrl, userToken, sessionId));
   },
 
   async addAlbumToQueue(payload, rootState) {
@@ -1084,6 +1121,7 @@ const effects = (dispatch) => ({
       playingTrackCount: newKeys.length,
       _lastQueuedAlbumId: albumId,
     });
+    dispatch.playerModel.updateNextTrack();
   },
 
   playerAutoNext(payload, rootState) {
@@ -1230,6 +1268,9 @@ const effects = (dispatch) => ({
         _adjacentAlbumPrefetched: !!queuedOk,
         _lastQueuedAlbumId: queuedOk ? adjacentAlbum.albumId : after._lastQueuedAlbumId,
       });
+      if (queuedOk) {
+        dispatch.playerModel.updateNextTrack();
+      }
     } catch (err) {
       console.error('prefetchAdjacentAlbum failed', err);
       // Leave _adjacentAlbumPrefetched false so scheduleAdjacentPrefetch / keep-alive can retry.
