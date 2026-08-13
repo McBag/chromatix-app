@@ -4,6 +4,7 @@
 
 import * as dashjs from 'dashjs';
 import type { PlayerInitParams } from 'types/player';
+import { resolveTrustedDurationSec } from 'js/utils/trustedDuration';
 
 // ======================================================================
 // STATE
@@ -19,6 +20,10 @@ let isResetting = false;
 // True before the first loadTrack() and after any reset() from unload().
 // initialize() must be called (not attachSource()) when this flag is set.
 let needsReinit = true;
+let lastGoodPositionSec = 0;
+let expectedDurationSec = 0;
+let pendingSeekSec: number | null = null;
+let progressHasMoved = false;
 
 // ======================================================================
 // INITIALISE
@@ -49,8 +54,24 @@ export const init = ({
     isResetting = false;
     onLoadStart();
   });
-  audioElement.addEventListener('canplay', onCanPlay);
-  audioElement.addEventListener('ended', onEnded);
+  audioElement.addEventListener('canplay', () => {
+    applyPendingSeek();
+    onCanPlay();
+  });
+  audioElement.addEventListener('timeupdate', () => {
+    snapshotElementPosition();
+  });
+  audioElement.addEventListener('ended', () => {
+    if (lastGoodPositionSec >= 1.5) {
+      const trusted = resolveTrustedDurationSec(audioElement?.duration || 0, expectedDurationSec);
+      const pos = audioElement?.currentTime || lastGoodPositionSec;
+      if (trusted <= 0 || pos < trusted - 1.5) {
+        recoverToSavedPosition(true);
+        return;
+      }
+    }
+    onEnded();
+  });
   audioElement.addEventListener('error', (event: Event) => {
     if (isResetting) return;
     // Suppress MEDIA_ERR_SRC_NOT_SUPPORTED (code 4) when src is empty — this is
@@ -95,14 +116,28 @@ export const unload = (): void => {
   isResetting = true;
   mediaPlayer.reset();
   needsReinit = true;
+  lastGoodPositionSec = 0;
+  expectedDurationSec = 0;
+  pendingSeekSec = null;
+  progressHasMoved = false;
 };
 
 // ======================================================================
 // LOAD TRACK
 // ======================================================================
 
-export const loadTrack = (dashSrc: string, progress: number = 0, play: boolean = true): void => {
+export const loadTrack = (
+  dashSrc: string,
+  progress: number = 0,
+  play: boolean = true,
+  durationMs: number = 0
+): void => {
   if (!mediaPlayer || !audioElement || !supported) return;
+
+  expectedDurationSec = durationMs > 0 ? durationMs / 1000 : 0;
+  lastGoodPositionSec = progress > 0 ? progress / 1000 : 0;
+  pendingSeekSec = progress > 0 ? progress / 1000 : null;
+  progressHasMoved = false;
 
   const startTime = progress > 0 ? progress / 1000 : undefined;
 
@@ -133,18 +168,19 @@ export const loadTrack = (dashSrc: string, progress: number = 0, play: boolean =
 // ======================================================================
 
 export const pause = (): void => {
+  snapshotElementPosition();
   if (mediaPlayer && supported) {
     mediaPlayer.pause();
   }
 };
 
 export const resume = (): void => {
-  if (mediaPlayer && supported) {
-    mediaPlayer.play();
-  }
+  recoverToSavedPosition(true);
 };
 
 export const restart = (): void => {
+  lastGoodPositionSec = 0;
+  pendingSeekSec = 0;
   if (mediaPlayer && supported) {
     mediaPlayer.seek(0);
     mediaPlayer.play();
@@ -166,19 +202,29 @@ export const setVolume = (volumeLevel: number): void => {
 // ======================================================================
 
 export const setProgress = (progress: number): void => {
-  if (mediaPlayer && supported) {
-    mediaPlayer.seek(progress / 1000);
-  }
+  if (!mediaPlayer || !supported) return;
+  const target = Math.max(0, progress / 1000);
+  lastGoodPositionSec = target;
+  pendingSeekSec = target;
+  mediaPlayer.seek(target);
 };
 
 export const getCurrentProgress = (): number => {
   // Use audioElement.currentTime directly — mediaPlayer.time() throws
   // PLAYBACK_NOT_INITIALIZED_ERROR when the player is not yet initialized.
-  return audioElement?.currentTime || 0;
+  if (!audioElement) return 0;
+  const live = audioElement.currentTime || 0;
+  if (live < 0.5 && lastGoodPositionSec > 1.5) return lastGoodPositionSec;
+  if (live > 0) {
+    lastGoodPositionSec = live;
+    return live;
+  }
+  return lastGoodPositionSec;
 };
 
 export const getCurrentDuration = (): number => {
-  return audioElement?.duration || 0;
+  if (!audioElement) return expectedDurationSec || 0;
+  return resolveTrustedDurationSec(audioElement.duration || 0, expectedDurationSec);
 };
 
 export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
@@ -191,7 +237,12 @@ export const getCurrentPlayerElement = (): HTMLAudioElement | null => {
  */
 export const ensureActivePlayback = (): void => {
   if (!mediaPlayer || !audioElement || !supported || needsReinit) return;
-  if (audioElement.ended) return;
+  if (isElementAtTrackEnd()) return;
+
+  if (audioElement.ended) {
+    recoverToSavedPosition(true);
+    return;
+  }
 
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = 'playing';
@@ -213,17 +264,77 @@ export const isActivePlaybackAudible = (): boolean => {
   return !audioElement.paused && !audioElement.ended && audioElement.readyState >= 2;
 };
 
+const applyPendingSeek = (): void => {
+  if (!audioElement || pendingSeekSec == null) return;
+  const target = pendingSeekSec;
+  if (Math.abs((audioElement.currentTime || 0) - target) > 0.4 && mediaPlayer && supported) {
+    try {
+      mediaPlayer.seek(target);
+    } catch {
+      // not ready
+    }
+  }
+  lastGoodPositionSec = target;
+};
+
+const snapshotElementPosition = (): void => {
+  if (!audioElement) return;
+  const timeSec = audioElement.currentTime;
+  if (!Number.isFinite(timeSec) || timeSec < 0) return;
+  const trusted = resolveTrustedDurationSec(audioElement.duration || 0, expectedDurationSec);
+  if (trusted > 0 && timeSec >= trusted - 0.15 && lastGoodPositionSec + 2 < trusted) return;
+  if (timeSec < 0.25 && lastGoodPositionSec > 1.5) return;
+  if (timeSec > lastGoodPositionSec + 0.05) progressHasMoved = true;
+  lastGoodPositionSec = timeSec;
+};
+
+export const recoverToSavedPosition = (play: boolean = true): void => {
+  if (!mediaPlayer || !audioElement || !supported || needsReinit) return;
+  if (isElementAtTrackEnd()) return;
+
+  const target = pendingSeekSec != null ? pendingSeekSec : lastGoodPositionSec;
+  if (target > 0) {
+    try {
+      mediaPlayer.seek(target);
+      audioElement.currentTime = target;
+    } catch {
+      pendingSeekSec = target;
+    }
+  }
+
+  if (play) {
+    try {
+      mediaPlayer.play();
+    } catch {
+      // ignore
+    }
+    void Promise.resolve(audioElement.play()).catch(() => null);
+  }
+};
+
 export const isElementAtTrackEnd = (): boolean => {
   if (!audioElement) return false;
-  if (audioElement.ended) return true;
-  const duration = audioElement.duration;
-  if (!duration || duration <= 0 || Number.isNaN(duration)) return false;
-  return audioElement.currentTime >= duration - 0.15;
+  const trusted = resolveTrustedDurationSec(audioElement.duration || 0, expectedDurationSec);
+  const progress = audioElement.currentTime || 0;
+
+  if (audioElement.ended) {
+    if (trusted > 0 && progress < trusted - 1) return false;
+    if (trusted > 0 && progress >= trusted - 1) return true;
+    return !progressHasMoved && lastGoodPositionSec < 1.5;
+  }
+
+  if (!trusted || trusted <= 0 || Number.isNaN(trusted)) return false;
+  if (progress < 1.5) return false;
+  return progress >= trusted - 0.15;
 };
 
 export const handleBecameHidden = (): void => {
   if (!audioElement || needsReinit) return;
   if (isElementAtTrackEnd()) return;
+  if (audioElement.ended) {
+    recoverToSavedPosition(true);
+    return;
+  }
   ensureActivePlayback();
   // Match native: long re-assert window — Tesla often re-pauses late after minimize.
   [0, 50, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 60000, 120000].forEach((delayMs) => {
@@ -240,7 +351,12 @@ export const handleBecameHidden = (): void => {
 export const runBackgroundPlaybackTick = (): boolean => {
   // Returns true when the track has ended and the caller should advance.
   if (!audioElement || needsReinit) return false;
+  snapshotElementPosition();
   if (isElementAtTrackEnd()) return true;
+  if (audioElement.ended) {
+    recoverToSavedPosition(true);
+    return false;
+  }
   if (audioElement.paused) {
     ensureActivePlayback();
   }

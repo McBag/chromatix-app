@@ -20,7 +20,7 @@ interface UsePlayerProgressReturn {
   trackProgressMax: number;
   handleProgressChange: (value: number) => void;
   handleProgressMouseDown: () => void;
-  handleProgressMouseUp: () => void;
+  handleProgressMouseUp: (value?: number) => void;
   isDisabled: boolean;
 }
 
@@ -46,6 +46,8 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
   const playingTrackKeys = useSelector(({ sessionModel }: any) => sessionModel.playingTrackKeys);
 
   const [trackProgress, setTrackProgress] = useState(playerX.getCurrentProgress() * 1000 || 0);
+  const latestProgressRef = useRef(trackProgress);
+  latestProgressRef.current = trackProgress;
 
   const realIndex = playingTrackKeys?.[playingTrackIndex];
   const trackCurrent = playingTrackList?.[realIndex];
@@ -57,9 +59,11 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
   // Handle progress change
   const handleProgressChange = useCallback(
     (value: number) => {
-      setTrackProgress(value * 1000);
+      const ms = value * 1000;
+      latestProgressRef.current = ms;
+      setTrackProgress(ms);
       if (updateStore) {
-        dispatch.playerModel.playerProgress(value * 1000);
+        dispatch.playerModel.playerProgress(ms);
       }
     },
     [dispatch, updateStore]
@@ -71,10 +75,19 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
   }, []);
 
   // Handle mouse up (on scrubber)
-  const handleProgressMouseUp = useCallback(() => {
-    mouseDownRef.current = false;
-    playerX.setProgress(trackProgress);
-  }, [trackProgress]);
+  const handleProgressMouseUp = useCallback(
+    (value?: number) => {
+      mouseDownRef.current = false;
+      const ms = typeof value === 'number' && Number.isFinite(value) ? value * 1000 : latestProgressRef.current;
+      latestProgressRef.current = ms;
+      setTrackProgress(ms);
+      playerX.setProgress(ms);
+      if (updateStore) {
+        dispatch.playerModel.playerProgress(ms);
+      }
+    },
+    [dispatch, updateStore]
+  );
 
   // Handle track progress updates
   const updateTrackProgress = useCallback(() => {

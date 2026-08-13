@@ -57,9 +57,9 @@ export const RangeSlider = ({
           value={value}
           onChange={(event) => !isDisabled && debouncedHandleChange(parseFloat(event.target.value))}
           onMouseDown={!isDisabled ? handleMouseDown : undefined}
-          onMouseUp={!isDisabled ? handleMouseUp : undefined}
+          onMouseUp={!isDisabled ? (event) => handleMouseUp?.(parseFloat(event.currentTarget.value)) : undefined}
           onTouchStart={!isDisabled ? handleMouseDown : undefined}
-          onTouchEnd={!isDisabled ? handleMouseUp : undefined}
+          onTouchEnd={!isDisabled ? (event) => handleMouseUp?.(parseFloat(event.currentTarget.value)) : undefined}
           disabled={isDisabled}
           tabIndex={allowAccess && !isDisabled ? 0 : -1}
         />

@@ -521,7 +521,43 @@ describe('Player Service', () => {
       // The player does no bounds-checking; the browser would clamp it.
       // Verify no throw and the value is set.
       player.setProgress(-5000);
-      expect(elementA().currentTime).toBe(-5);
+      expect(elementA().currentTime).toBe(0);
+    });
+
+    test('pause then resume restores the saved position if currentTime reset', async () => {
+      defaultInit();
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3', 0, true, 200000);
+      await Promise.resolve();
+      elementA().currentTime = 42;
+      player.pause();
+      elementA().currentTime = 0;
+      player.resume();
+      await Promise.resolve();
+      expect(elementA().currentTime).toBe(42);
+      expect(mockCallbacks.onEnded).not.toHaveBeenCalled();
+    });
+
+    test('ended mid-track with known duration does not skip to the next song', () => {
+      defaultInit();
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3', 50000, true, 200000);
+      elementA().currentTime = 50;
+      (elementA() as any).ended = true;
+      (elementA() as any).mockTriggerEvent('ended');
+      expect(mockCallbacks.onEnded).not.toHaveBeenCalled();
+      expect(elementA().currentTime).toBe(50);
+    });
+
+    test('seek is remembered across a buffer reload', () => {
+      defaultInit();
+      player.loadTrack('http://example.com/track1.mp3', 0, true, 200000);
+      player.setProgress(90000);
+      expect(elementA().currentTime).toBe(90);
+      elementA().currentTime = 0;
+      expect(player.getPlaybackProgressMs()).toBe(90000);
+      player.recoverToSavedPosition(false);
+      expect(elementA().currentTime).toBe(90);
     });
   });
 });

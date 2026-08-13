@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import * as playerX from 'js/services/player';
+import { resolveTrustedDurationMs } from 'js/utils/trustedDuration';
 
 const hiddenPollMs = 100;
 const visiblePollMs = 500;
@@ -83,6 +84,21 @@ const usePlaybackKeepAlive = (): null => {
   playerPlayingRef.current = playerPlaying;
   manualPauseRef.current = manualPause;
 
+  const wasPausedRef = useRef(true);
+
+  // Pause time must not count as played time. Otherwise resume near the end of
+  // a song (or after a long pause) trips wall-clock auto-next immediately.
+  useEffect(() => {
+    const isPaused = Boolean(manualPause || !playerPlaying);
+    if (wasPausedRef.current && !isPaused) {
+      const playedMs = playerX.getPlaybackProgressMs();
+      if (playedMs > 0) {
+        trackStartRef.current = Date.now() - playedMs;
+      }
+    }
+    wasPausedRef.current = isPaused;
+  }, [manualPause, playerPlaying]);
+
   useEffect(() => {
     const trackKey = playingTrackKeys?.[playingTrackIndex];
     if (trackKey !== lastTrackKeyRef.current) {
@@ -140,9 +156,10 @@ const usePlaybackKeepAlive = (): null => {
       const trackKey = playingTrackKeys?.[playingTrackIndex];
       const currentTrack = trackKey != null ? playingTrackList?.[trackKey] : null;
       const elementDurationMs = playerX.getCurrentDuration() * 1000;
-      // Prefer the live element duration. Metadata that is a few seconds short
-      // used to trip auto-next before the file actually ended.
-      const durationMs = elementDurationMs > 1000 ? elementDurationMs : currentTrack?.duration || 0;
+      const metadataDurationMs = currentTrack?.duration || 0;
+      // Prefer live duration when it looks complete; fall back to metadata when
+      // the element duration collapsed after pause / a dropped connection.
+      const durationMs = resolveTrustedDurationMs(elementDurationMs, metadataDurationMs);
 
       // Seed wall-clock start from real playback progress (deferred so buffering
       // at track start does not cut the song short). Pure wall-clock without a
@@ -162,9 +179,12 @@ const usePlaybackKeepAlive = (): null => {
       // from the previous element used to skip song 4).
       if (durationMs > 0 && sinceTrackChange >= 2500 && playedMs >= 2000) {
         const nearEndByProgress = playedMs >= durationMs - wallClockEndEpsilonMs;
-        const progressNearEnd = playedMs >= Math.max(durationMs * 0.85, durationMs - 15000);
+        // Only use wall-clock as a last resort in the final 2s — a stall at 85%
+        // is a network freeze, not the end of the song.
         const wallPastEnd =
-          Boolean(trackStart) && Date.now() - (trackStart as number) >= durationMs + 2000 && progressNearEnd;
+          Boolean(trackStart) &&
+          Date.now() - (trackStart as number) >= durationMs + 2000 &&
+          playedMs >= durationMs - 2000;
         if (nearEndByProgress || wallPastEnd) {
           playerX.requestTrackAdvance();
         }

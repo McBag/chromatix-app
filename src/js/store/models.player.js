@@ -20,6 +20,8 @@ import store from 'js/store/store';
 // ======================================================================
 
 const isLocal = import.meta.env.VITE_ENV === 'local';
+const MAX_PLAYBACK_RECOVERIES = 5;
+let playbackRecoveryCount = 0;
 
 const playerState = {
   playerInited: false,
@@ -201,6 +203,7 @@ const effects = (dispatch) => ({
     };
     const onCanPlay = () => {
       // console.log('canplay');
+      playbackRecoveryCount = 0;
       clearTimeout(loadstartTimeoutId);
       dispatch.playerModel.playerSetLoading(false);
     };
@@ -339,6 +342,9 @@ const effects = (dispatch) => ({
 
     const playerTrackLoaded = rootState.playerModel.playerTrackLoaded;
     const playerPlaying = rootState.playerModel.playerPlaying;
+    const manualPause = rootState.sessionModel._manualPause;
+    const isTransient =
+      mediaError?.code === MediaError.MEDIA_ERR_NETWORK || mediaError?.code === MediaError.MEDIA_ERR_DECODE;
 
     // Always log the error so we can diagnose it
     console.error('%c--- player - error ---', 'color:#f00', {
@@ -353,11 +359,55 @@ const effects = (dispatch) => ({
     // Recover during cold-load gaps as well (playerPlaying may already be true
     // while playerTrackLoaded flickers), so background auto-next does not die.
     if (playerTrackLoaded || playerPlaying) {
+      // Flaky connections should resume the same song at the same position —
+      // never skip just because a segment failed to fetch.
+      if (isTransient) {
+        if (manualPause) {
+          dispatch.playerModel.setPlayerState({
+            playerTrackError: true,
+          });
+          return;
+        }
+        dispatch.playerModel.playerRecoverPlayback();
+        return;
+      }
+
       dispatch.playerModel.setPlayerState({
         playerTrackError: true,
       });
       dispatch.playerModel.playerErrorPlayback(true);
     }
+  },
+
+  playerRecoverPlayback(payload, rootState) {
+    if (rootState.sessionModel._manualPause) return;
+
+    const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
+    if (playingTrackIndex !== 0 && !playingTrackIndex) return;
+
+    playbackRecoveryCount += 1;
+    if (playbackRecoveryCount > MAX_PLAYBACK_RECOVERIES) {
+      playbackRecoveryCount = 0;
+      dispatch.playerModel.setPlayerState({
+        playerTrackError: true,
+      });
+      dispatch.playerModel.playerErrorPlayback(true);
+      return;
+    }
+
+    const liveProgress = playerX.getPlaybackProgressMs();
+    const storedProgress = rootState.sessionModel.playingTrackProgress || 0;
+    const progress = liveProgress > 0 ? liveProgress : storedProgress;
+
+    dispatch.sessionModel.setPlayingTrackProgress(progress);
+    dispatch.playerModel.setPlayerState({
+      playerTrackError: false,
+    });
+    dispatch.playerModel.playerLoadIndex({
+      index: playingTrackIndex,
+      play: true,
+      progress,
+    });
   },
 
   playerErrorPlayback(payload, rootState) {
@@ -799,40 +849,46 @@ const effects = (dispatch) => ({
     dispatch.sessionModel.setSessionState({ _manualPause: false });
     playerX.clearManualPauseFlag();
     const playerTrackError = rootState.playerModel.playerTrackError;
+    const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
+    const liveProgress = playerX.getPlaybackProgressMs();
+    const storedProgress = rootState.sessionModel.playingTrackProgress || 0;
+    const progress = liveProgress > 0 ? liveProgress : storedProgress;
+    dispatch.sessionModel.setPlayingTrackProgress(progress);
+
     // If we know there was previously an error with the current track, try to load it again
     if (playerTrackError) {
-      const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
-      dispatch.playerModel.playerLoadIndex({ index: playingTrackIndex, play: true });
+      dispatch.playerModel.playerLoadIndex({ index: playingTrackIndex, play: true, progress });
     }
     // Otherwise, resume as normal
     else {
-      playerX.resume();
-      playerX.nudgeActivePlayback();
+      const element = playerX.getCurrentPlayerElement?.();
+      const lostSource = !element?.src || Boolean(element?.error);
+      if (lostSource) {
+        dispatch.playerModel.playerLoadIndex({ index: playingTrackIndex, play: true, progress });
+      } else {
+        playerX.resume();
+        playerX.nudgeActivePlayback();
+      }
       dispatch.playerModel.setPlayerState({
         playerPlaying: true,
       });
       // log playback state to server
       const currentService = rootState.appModel.currentService;
-      const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
       const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
       const playingTrackList = rootState.sessionModel.playingTrackList;
-      const playingTrackProgress = rootState.sessionModel.playingTrackProgress;
       const currentTrack = playingTrackList[playingTrackKeys[playingTrackIndex]];
-      bridge.logPlaybackPlay(currentTrack, playingTrackProgress);
+      bridge.logPlaybackPlay(currentTrack, progress);
       analyticsEvent(toUpperFirst(currentService) + ' / Music / Play (Resume)');
     }
   },
 
   playerProgress(payload, rootState) {
     // console.log('%c--- playerProgress ---', 'color:#5c16b1');
+    // Always persist — seek/pause must keep the same position across reconnects.
+    dispatch.sessionModel.setPlayingTrackProgress(payload);
+
     const playerPlaying = rootState.playerModel.playerPlaying;
     if (playerPlaying) {
-      dispatch.sessionModel.setPlayingTrackProgress(payload);
-
-      // // Update player with current progress (handles auto-preloading internally)
-      // // [NOTE] Not currently used, but may be in future
-      // playerX.updateProgress(payload);
-
       // log playback state to server
       const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
       const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
@@ -844,6 +900,10 @@ const effects = (dispatch) => ({
 
   playerPause(payload, rootState) {
     // console.log('%c--- playerPause ---', 'color:#5c16b1');
+    const liveProgress = playerX.getPlaybackProgressMs();
+    if (liveProgress > 0) {
+      dispatch.sessionModel.setPlayingTrackProgress(liveProgress);
+    }
     dispatch.sessionModel.setSessionState({ _manualPause: true });
     playerX.pause();
     // log playback state to server
@@ -855,7 +915,7 @@ const effects = (dispatch) => ({
       const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
       const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
       const playingTrackList = rootState.sessionModel.playingTrackList;
-      const playingTrackProgress = rootState.sessionModel.playingTrackProgress;
+      const playingTrackProgress = liveProgress > 0 ? liveProgress : rootState.sessionModel.playingTrackProgress;
       const currentTrack = playingTrackList[playingTrackKeys[playingTrackIndex]];
       bridge.logPlaybackPause(currentTrack, playingTrackProgress);
       analyticsEvent(toUpperFirst(currentService) + ' / Music / Pause');

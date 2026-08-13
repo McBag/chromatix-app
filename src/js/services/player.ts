@@ -17,6 +17,7 @@ interface PlayerTrack {
   dashSrc?: string | null;
   codec?: string | null;
   trackKey?: string | null;
+  duration?: number | null;
 }
 
 // ======================================================================
@@ -26,6 +27,7 @@ interface PlayerTrack {
 type ActivePlayer = 'native' | 'dash';
 
 let activePlayer: ActivePlayer = 'native';
+let onlineRecoveryBound = false;
 
 // ======================================================================
 // INITIALISE / UNLOAD
@@ -52,6 +54,13 @@ export const init = (params: PlayerInitParams): void => {
       // else console.log('%c--- player - native error suppressed (dash is active) ---', 'color:#4c25b9', e);
     },
   });
+  if (typeof window !== 'undefined' && !onlineRecoveryBound) {
+    onlineRecoveryBound = true;
+    window.addEventListener('online', () => {
+      recoverToSavedPosition();
+    });
+  }
+
   dashX.init({
     ...params,
     onLoadStart: () => {
@@ -94,7 +103,7 @@ export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolea
     nativeX.unload({ preserveKeepAlive: true });
     nativeX.setNextTrack(null);
     if (play) nativeX.ensureAudioKeepAlive();
-    dashX.loadTrack(track.dashSrc, progress, play);
+    dashX.loadTrack(track.dashSrc, progress, play, track.duration || 0);
     activePlayer = 'dash';
   } else if (transcoding && !track.dashSrc && track.trackKey && dashX.isSupported()) {
     // Plex track that needs DASH but dashSrc is unavailable — credentials not
@@ -107,7 +116,7 @@ export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolea
     // Native path: either codec is supported, or the src URL already embeds
     // server-side transcoding (e.g. Jellyfin universal endpoint).
     dashX.unload();
-    nativeX.loadTrack(track.src, progress, play);
+    nativeX.loadTrack(track.src, progress, play, track.duration || 0);
     activePlayer = 'native';
   }
   return true;
@@ -158,6 +167,15 @@ export const resume = (): void => {
   } else {
     nativeX.resume();
   }
+};
+
+export const recoverToSavedPosition = (): void => {
+  const play = !nativeX.isManualPause();
+  if (activePlayer === 'dash') {
+    dashX.recoverToSavedPosition(play);
+    return;
+  }
+  nativeX.recoverToSavedPosition(play);
 };
 
 export const restart = (): void => {
