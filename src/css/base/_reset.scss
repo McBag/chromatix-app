@@ -106,10 +106,15 @@ input[type='select'] {
 }
 button {
   appearance: none;
+  -webkit-appearance: none;
   background: none;
   border: none;
   border-radius: 0;
   cursor: pointer;
+  // Tesla's in-car browser applies a large UA min-width to <button>,
+  // which stretches circular icon buttons into ovals.
+  min-width: 0;
+  min-height: 0;
 }
 
 // misc other elements

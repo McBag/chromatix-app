@@ -85,6 +85,7 @@ const ArtistArray = ({ pageTitle = 'Artists', pageVariant = 'Artists', singularN
           entries={sortedArtists}
           showFavs={gridOptions.isFavourite}
           showRatings={gridOptions.userRating}
+          alphabetNav={sortArtists === 'title' && orderArtists === 'asc'}
         >
           {titleBlock}
         </ViewGrid>
@@ -96,6 +97,7 @@ const ArtistArray = ({ pageTitle = 'Artists', pageVariant = 'Artists', singularN
           sortKey={sortArtists}
           orderKey={orderArtists}
           colOptions={colOptions}
+          alphabetNav={sortArtists === 'title' && orderArtists === 'asc'}
         >
           {titleBlock}
         </ViewList>

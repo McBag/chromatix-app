@@ -52,6 +52,7 @@ const ViewGrid = ({
   showReleaseDate = false,
   showTotalItems = false,
   showTotalTracks = false,
+  alphabetNav = false,
 }) => {
   const currentService = useSelector(({ appModel }) => appModel.currentService);
   const platformOpts = platformFeatures[currentService] || {};
@@ -107,7 +108,7 @@ const ViewGrid = ({
     });
 
     return (
-      <div className={clsx(style.wrap)}>
+      <div className={clsx(style.wrap, alphabetNav && style.wrapAlphabetNav)}>
         <ListBodyComponent
           entries={entriesWithTrackNumbers}
           collectionId={collectionId}

@@ -29,7 +29,6 @@ const ControlBar = () => {
     <div className={style.wrap} data-allow-key-controls>
       <div className={style.leftSection}>
         <PrimaryControls />
-        <ControlProgress />
       </div>
 
       <div className={style.centerSection}>
@@ -39,6 +38,8 @@ const ControlBar = () => {
       <div className={style.rightSection}>
         <SecondaryControls />
       </div>
+
+      <ControlProgress />
     </div>
   );
 };

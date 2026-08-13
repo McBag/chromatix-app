@@ -4,17 +4,25 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   top: 0;
-  bottom: var(--control-bar-height, 100px);
-  right: 16px;
+  bottom: var(--control-bar-height, 108px);
+  right: 8px;
   z-index: 5;
   pointer-events: none;
 
-  &QueueOpen {
-    right: 296px;
+  @media (min-width: 1100px) {
+    right: 16px;
+    gap: 2px;
+  }
 
-    @media (min-width: 1024px) {
+  &QueueOpen {
+    right: 248px;
+
+    @media (min-width: 880px) {
+      right: 268px;
+    }
+    @media (min-width: 1100px) {
       right: 336px;
     }
   }
@@ -24,18 +32,31 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
   pointer-events: auto;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
   min-width: 22px;
-  height: 22px;
-  padding: 0 4px;
+  max-width: 22px;
+  height: 18px;
+  min-height: 18px;
+  max-height: 22px;
+  padding: 0;
   background: none;
   border: none;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1;
   color: var(--color-opacity-07);
   cursor: pointer;
+
+  @media (min-width: 1100px) {
+    height: 22px;
+    font-size: 12px;
+  }
 
   &:hover:not(:disabled) {
     background: var(--color-core);

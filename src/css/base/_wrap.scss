@@ -44,8 +44,10 @@
 }
 
 .layout {
-  // Keep controls row height fixed so content area does not jump with track metadata.
-  --control-bar-height: 120px;
+  // Compact default matches Tesla split-browser width; wider panes step up at 1100px.
+  --control-bar-height: 108px;
+  --control-btn: 44px;
+  --control-btn-play: 52px;
 
   display: grid;
   grid-template-areas:
@@ -55,24 +57,27 @@
   grid-template-columns: auto 1fr auto;
   height: 100vh;
   height: 100svh;
+
+  @media (min-width: 1100px) {
+    --control-bar-height: 120px;
+    --control-btn: 48px;
+    --control-btn-play: 60px;
+  }
 }
 
 .layout-sidebar {
   overflow: auto;
   grid-area: sidebar;
-  width: 180px;
+  width: 168px;
   background: var(--color-primary-bg);
 
-  @media (min-width: 880px) {
-    width: 190px;
-  }
   @media (min-width: 960px) {
+    width: 180px;
+  }
+  @media (min-width: 1100px) {
     width: 200px;
   }
-  @media (min-width: 1024px) {
-    width: 210px;
-  }
-  @media (min-width: 1140px) {
+  @media (min-width: 1280px) {
     width: 220px;
   }
 

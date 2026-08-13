@@ -2,6 +2,9 @@
 @use '../../../css/_config/_vars';
 
 .wrap {
+  --control-btn: 48px;
+  --control-btn-play: 60px;
+
   display: flex;
   flex-direction: column;
   justify-content: space-between;

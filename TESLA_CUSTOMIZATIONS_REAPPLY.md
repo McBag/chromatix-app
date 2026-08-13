@@ -209,22 +209,31 @@ Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackLi
 
 - `src/js/components/ControlBar/ControlBar.jsx` + `.module.scss`
 - `src/js/components/SettingsControls/SettingsControls.jsx` — Album toggle (`controlBarAlbum`)
+- `src/css/base/_wrap.scss` — `--control-bar-height` + slimmer sidebar below 1100px
+- `src/css/base/_reset.scss` — `button { min-width: 0 }` so Tesla UA styles cannot stretch icon buttons into ovals
 
-### Layout
+### Layout (Tesla split-browser first)
 
-| Section | Content                                                         |
-| ------- | --------------------------------------------------------------- |
-| Left    | Shuffle / prev / play-pause / next / repeat + scrubber          |
-| Center  | Cover, title, artist, **album** (if enabled), favourite, rating |
-| Right   | Full page, queue, volume                                        |
+Tesla’s browser sits in the **right half** of the 15.4″ screen (~900–1100×700 CSS px). The previous 3 equal columns put transport **and** the scrubber in the left column, so the 5 large buttons overflowed and the play button became an oval.
 
-### Sizing (default)
+| Area        | Content                                                         |
+| ----------- | --------------------------------------------------------------- |
+| Transport   | Shuffle / prev / play-pause / next / repeat (auto width)        |
+| Now playing | Cover, title, artist, **album** (if enabled), favourite, rating |
+| Secondary   | Full page, queue, volume                                        |
+| Scrubber    | Full-width row under the three columns                          |
 
-- Play / Pause: **60 px**
-- Other transport / queue / volume: **48 px**
-- Bar min-height: **116 px** (`--control-bar-height`)
-- Cover in bar: **56 px**
-- Column containment: `min-width: 0`, `overflow: hidden` (no section bleed)
+### Sizing
+
+| Viewport        | Play | Other buttons | Bar height | Sidebar |
+| --------------- | ---- | ------------- | ---------- | ------- |
+| default / Tesla | 52   | 44            | 108        | 168–180 |
+| ≥ 1100px        | 60   | 48            | 120        | 200     |
+| ≥ 1280px        | 60   | 48            | 120        | 220     |
+
+Buttons are locked with `flex: 0 0 auto`, `min/max-width/height`, `aspect-ratio: 1`, `appearance: none` (same trick as album-card play buttons).
+
+AlphabetNav sits in a reserved 36px gutter so letters no longer overlay artist cards.
 
 Hooks: `useMediaControls` + `useKeyMediaControls` + `useMediaMeta`.
 

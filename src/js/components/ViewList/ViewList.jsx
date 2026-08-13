@@ -64,6 +64,7 @@ const ViewListBasic = ({
   sortKey = sortString ? sortString.split('-')[0] : null,
   orderKey = sortString ? sortString.split('-')[1] : null,
   colOptions,
+  alphabetNav = false,
 }) => {
   const { tableVariant, tableOptions, gridTemplateColumns, handleSortFunction } = useTableOptions(
     variant,
@@ -102,7 +103,11 @@ const ViewListBasic = ({
     const TableBodyComponent = entries.length <= virtualThreshold ? TableBodyStatic : TableBodyVirtual;
 
     return (
-      <div className={clsx(style.wrap, style['wrap' + variant?.charAt(0).toUpperCase() + variant?.slice(1)], {})}>
+      <div
+        className={clsx(style.wrap, style['wrap' + variant?.charAt(0).toUpperCase() + variant?.slice(1)], {
+          [style.wrapAlphabetNav]: alphabetNav,
+        })}
+      >
         <TableBodyComponent
           entries={entriesWithGroups}
           collectionId={collectionId}

@@ -2,30 +2,43 @@
 @use '../../../css/_config/_vars';
 
 .wrap {
-  // Fixed height so the bar never jumps when title/artist/album length or rating rows change.
-  --control-bar-height: 120px;
+  // Compact default fits Tesla's split-browser pane (~900–1100px wide).
+  --control-bar-height: 108px;
+  --control-btn: 44px;
+  --control-btn-play: 52px;
 
   display: grid;
   align-items: center;
-  // Equal side columns keep transport + volume from sliding when metadata width changes.
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 380px) minmax(0, 1fr);
-  column-gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    'transport nowplaying secondary'
+    'scrubber scrubber scrubber';
+  column-gap: 10px;
+  row-gap: 0;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   height: var(--control-bar-height);
   min-height: var(--control-bar-height);
   max-height: var(--control-bar-height);
-  padding: 8px 22px;
+  padding: 6px 14px 8px;
   overflow: hidden;
   background: var(--color-secondary-bg);
   border-top: 1px solid var(--color-secondary-border);
   text-align: center;
 
-  @media (min-width: 1024px) {
+  @media (min-width: 1100px) {
+    --control-bar-height: 120px;
+    --control-btn: 48px;
+    --control-btn-play: 60px;
+    column-gap: 16px;
+    padding: 8px 22px;
+  }
+
+  @media (min-width: 1280px) {
     column-gap: 18px;
     padding: 8px 24px;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px) minmax(0, 1fr);
   }
 
   a {
@@ -39,24 +52,26 @@
 
 .leftSection {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
   justify-self: start;
+  grid-area: transport;
   box-sizing: border-box;
-  gap: 2px;
-  width: 100%;
+  gap: 0;
+  width: auto;
   min-width: 0;
-  max-width: 620px;
+  max-width: none;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .centerSection {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  justify-self: center;
+  justify-self: stretch;
+  grid-area: nowplaying;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
@@ -84,10 +99,16 @@
 .coverWrap {
   position: relative;
   flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
-  margin-right: 12px;
+  width: 48px;
+  height: 48px;
+  margin-right: 10px;
   border-radius: 6px;
+
+  @media (min-width: 1100px) {
+    width: 56px;
+    height: 56px;
+    margin-right: 12px;
+  }
 }
 
 .coverWrap {
@@ -224,17 +245,22 @@
 .primaryControls {
   display: flex;
   flex-shrink: 0;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  gap: 8px;
-  width: 100%;
+  gap: 2px;
+  width: auto;
 
-  @media (min-width: 1024px) {
+  @media (min-width: 1100px) {
+    gap: 8px;
+  }
+
+  @media (min-width: 1280px) {
     gap: 12px;
   }
 
   &.fullPageMode {
     width: auto;
+    justify-content: center;
 
     @media (max-width: 1023px) {
       justify-content: flex-start;
@@ -253,16 +279,26 @@ button.shuffle,
 button.volume,
 span.settings,
 .offline {
-  display: block;
+  display: flex;
   position: relative;
-  width: 48px;
-  height: 48px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--control-btn, 44px);
+  height: var(--control-btn, 44px);
+  min-width: var(--control-btn, 44px);
+  min-height: var(--control-btn, 44px);
+  max-width: var(--control-btn, 44px);
+  max-height: var(--control-btn, 44px);
   padding: 8px;
-  // margin: 0 5px;
+  aspect-ratio: 1 / 1;
+  appearance: none;
+  -webkit-appearance: none;
   background: none;
-  border: none;
   border: 2px solid transparent;
   border-radius: 50%;
+  overflow: hidden;
   cursor: pointer;
 
   @include mixins.focus-self-outline;
@@ -283,12 +319,21 @@ span.settings,
 
 button.play,
 button.pause {
-  margin: 0 6px;
-  width: 60px;
-  height: 60px;
+  margin: 0 2px;
+  width: var(--control-btn-play, 52px);
+  height: var(--control-btn-play, 52px);
+  min-width: var(--control-btn-play, 52px);
+  min-height: var(--control-btn-play, 52px);
+  max-width: var(--control-btn-play, 52px);
+  max-height: var(--control-btn-play, 52px);
+  padding: 0;
   background: var(--color-core) !important;
   border: 1px solid var(--color-opacity-01);
   color: var(--color-secondary-bg);
+
+  @media (min-width: 1100px) {
+    margin: 0 6px;
+  }
 
   .fullPageMode & {
     color: var(--color-primary-bg);
@@ -301,11 +346,19 @@ button.pause {
 }
 
 button.play {
-  padding: 17px 13px 17px 17px;
+  padding: 14px 11px 14px 15px;
+
+  @media (min-width: 1100px) {
+    padding: 17px 13px 17px 17px;
+  }
 }
 
 button.pause {
-  padding: 17px;
+  padding: 14px;
+
+  @media (min-width: 1100px) {
+    padding: 17px;
+  }
 }
 
 button.rewind {
@@ -389,8 +442,11 @@ button.active {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  grid-area: scrubber;
   width: 100%;
-  margin: 4px 0 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0 2px;
 }
 
 .scrubSlider {
@@ -423,6 +479,7 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  grid-area: secondary;
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
@@ -463,9 +520,14 @@ button.active {
 }
 
 .volSlider {
-  width: 100px;
+  flex: 0 0 auto;
+  width: 72px;
 
-  @media (min-width: 1024px) {
+  @media (min-width: 1100px) {
+    width: 100px;
+  }
+
+  @media (min-width: 1280px) {
     width: 120px;
   }
 }
