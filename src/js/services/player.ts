@@ -337,7 +337,9 @@ export const handleBecameHidden = (): void => {
 // ======================================================================
 // NEXT-TRACK PRELOAD
 // Native A/B handoff: buffer the next src on a standby <audio> and start it
-// before the current track ends while the Tesla tab is minimized.
+// ~80ms (visible) / ~320ms (hidden) before the current track ends for gapless
+// playback. Hidden Tesla tabs get the slightly earlier start so play() wins
+// the JS-freeze-on-ended race without skipping the last seconds of a song.
 // ======================================================================
 
 // ======================================================================

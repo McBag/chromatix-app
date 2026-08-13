@@ -381,7 +381,7 @@ describe('Player Service', () => {
       expect(first?.paused).toBe(true);
     });
 
-    test('maybeWarmStartNext hands off before track end while hidden', async () => {
+    test('maybeWarmStartNext does not hand off 2s early while hidden', () => {
       player.setTrackEndedCallback(mockCallbacks.onEnded);
       player.loadTrack('http://example.com/track1.mp3');
       player.setNextTrack('http://example.com/track2.mp3');
@@ -391,12 +391,98 @@ describe('Player Service', () => {
       if (current) current.currentTime = 98;
 
       player.maybeWarmStartNext();
+
+      expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track1.mp3');
+      expect(mockCallbacks.onEnded).not.toHaveBeenCalled();
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    });
+
+    test('maybeWarmStartNext does not hand off 2s early while visible', () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+
+      const current = player.getCurrentPlayerElement();
+      if (current) current.currentTime = 98;
+
+      player.maybeWarmStartNext();
+
+      expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track1.mp3');
+      expect(mockCallbacks.onEnded).not.toHaveBeenCalled();
+    });
+
+    test('maybeWarmStartNext gapless-hands off in the last 300ms while hidden', async () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      const current = player.getCurrentPlayerElement();
+      if (current) current.currentTime = 99.75;
+
+      player.maybeWarmStartNext();
       await Promise.resolve();
       await Promise.resolve();
 
       expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track2.mp3');
-      expect(mockCallbacks.onEnded).toHaveBeenCalled();
+      expect(mockCallbacks.onEnded).toHaveBeenCalledTimes(1);
       Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    });
+
+    test('maybeWarmStartNext gapless-hands off in the last 80ms while visible', async () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+
+      const current = player.getCurrentPlayerElement();
+      if (current) current.currentTime = 99.95;
+
+      player.maybeWarmStartNext();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track2.mp3');
+      expect(mockCallbacks.onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    test('gapless handoff plus loadTrack does not skip the next song', async () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      player.loadTrack('http://example.com/track1.mp3');
+      player.setNextTrack('http://example.com/track2.mp3');
+
+      const current = player.getCurrentPlayerElement();
+      if (current) current.currentTime = 99.95;
+
+      player.maybeWarmStartNext();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockCallbacks.onEnded).toHaveBeenCalledTimes(1);
+      player.loadTrack('http://example.com/track2.mp3');
+      player.setNextTrack('http://example.com/track3.mp3');
+
+      expect(player.getCurrentPlayerElement()?.src).toBe('http://example.com/track2.mp3');
+      expect(mockCallbacks.onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    test('four-track gapless cycle advances one song at a time', async () => {
+      player.setTrackEndedCallback(mockCallbacks.onEnded);
+      const srcs = [1, 2, 3, 4].map((n) => `http://example.com/track${n}.mp3`);
+
+      player.loadTrack(srcs[0]);
+      for (let i = 0; i < 3; i++) {
+        player.setNextTrack(srcs[i + 1]);
+        const current = player.getCurrentPlayerElement();
+        if (current) current.currentTime = 99.95;
+        player.maybeWarmStartNext();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(player.getCurrentPlayerElement()?.src).toBe(srcs[i + 1]);
+        player.loadTrack(srcs[i + 1]);
+      }
+
+      expect(mockCallbacks.onEnded).toHaveBeenCalledTimes(3);
+      expect(player.getCurrentPlayerElement()?.src).toBe(srcs[3]);
     });
 
     test('getCurrentProgress() returns 0 after unload', () => {

@@ -139,27 +139,28 @@ const usePlaybackKeepAlive = (): null => {
 
       const trackKey = playingTrackKeys?.[playingTrackIndex];
       const currentTrack = trackKey != null ? playingTrackList?.[trackKey] : null;
-      const durationMs = currentTrack?.duration || playerX.getCurrentDuration() * 1000;
+      const elementDurationMs = playerX.getCurrentDuration() * 1000;
+      // Prefer the live element duration. Metadata that is a few seconds short
+      // used to trip auto-next before the file actually ended.
+      const durationMs = elementDurationMs > 1000 ? elementDurationMs : currentTrack?.duration || 0;
 
       // Seed wall-clock start from real playback progress (deferred so buffering
       // at track start does not cut the song short). Pure wall-clock without a
       // progress near-end check used to skip mid-track after long stalls.
       const playedMs = playerX.getPlaybackProgressMs();
+      const sinceTrackChange = Date.now() - trackChangedAtRef.current;
       if (!trackStartRef.current) {
-        const sinceTrackChange = Date.now() - trackChangedAtRef.current;
         // Ignore stale progress from the previous track during the cold-load gap.
-        if (!(sinceTrackChange < 2000 && playedMs > 1000)) {
+        if (!(sinceTrackChange < 2500 && playedMs > 1000)) {
           trackStartRef.current = Date.now() - playedMs;
         }
       }
       const trackStart = trackStartRef.current;
 
       // Advance only when we are actually near the end of the track.
-      // - Progress near end: normal path (element currentTime ~ duration)
-      // - Wall-clock past duration AND progress already ≥85% / within 15s of end:
-      //   covers Tesla cases where currentTime freezes at the last buffer point
-      //   without firing `ended`, without skipping mid-track stalls.
-      if (durationMs > 0) {
+      // Never fire in the first 2.5s after a swap (stale currentTime / duration
+      // from the previous element used to skip song 4).
+      if (durationMs > 0 && sinceTrackChange >= 2500 && playedMs >= 2000) {
         const nearEndByProgress = playedMs >= durationMs - wallClockEndEpsilonMs;
         const progressNearEnd = playedMs >= Math.max(durationMs * 0.85, durationMs - 15000);
         const wallPastEnd =

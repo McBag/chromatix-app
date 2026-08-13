@@ -3,7 +3,8 @@
 // ======================================================================
 
 const trackEndPollMs = 250;
-const trackEndEpsilonMs = 100;
+const trackEndNearEndPollMs = 50;
+const trackEndEpsilonMs = 80;
 const playRetryMs = 300;
 const hiddenPlayRetryMs = 200;
 const hiddenPlayMaxRetries = 16;
@@ -28,10 +29,14 @@ const keepAliveHealthMs = 2000;
 const pauseReassertDelaysMs = [0, 50, 120, 300, 700, 1500, 3000, 6000, 12000, 20000];
 // Extra re-play attempts after the page becomes hidden (Tesla often pauses later too).
 const becameHiddenBurstMs = [0, 50, 200, 500, 1000, 2000, 4000, 8000, 15000, 30000, 60000, 120000];
-// Hidden Tesla tabs often freeze JS the moment the current <audio> ends.
-// Start the already-buffered next track before that, then swap elements.
-const hiddenHandoffRemainingMs = 2500;
+// Gapless: start the preloaded next element just before the current one ends.
+// Visible tabs can be tight; hidden Tesla tabs may freeze JS on `ended`, so
+// start a few hundred ms earlier — never multiple seconds (that skipped songs).
+const gaplessLeadMsVisible = 80;
+const gaplessLeadMsHidden = 320;
 const hiddenLoopGuardRemainingMs = 4000;
+const nearEndPollRemainingMs = 5000;
+const minPlayedBeforeEndMs = 1500;
 
 let playerContainer: HTMLDivElement | null = null;
 let trackEndPollId: number | null = null;
@@ -53,6 +58,9 @@ let nextTrackSrc: string | null = null;
 let preloadedSrc: string | null = null;
 let warmStartActive = false;
 let lastKnownCurrentTime = 0;
+let lastAdvancedToSrc: string | null = null;
+let gaplessTimerId: number | null = null;
+let trackEndPollMsCurrent = trackEndPollMs;
 let onLoadStartCb: () => void = () => undefined;
 let onCanPlayCb: () => void = () => undefined;
 let onErrorCb: (params: { event: Event; playerElement: HTMLAudioElement }) => void = () => undefined;
@@ -160,6 +168,11 @@ const setupPlayerElement = (element: HTMLAudioElement, volumeLevel: number, volu
     if (!trackEndPollId) {
       startTrackEndPolling();
     }
+    scheduleGaplessTimer();
+  });
+  element.addEventListener('timeupdate', () => {
+    if (!isActivePlayer(element) || pausedByUser) return;
+    maybeWarmStartNext();
   });
   element.addEventListener('stalled', () => {
     if (isActivePlayer(element) && !pausedByUser) {
@@ -256,27 +269,50 @@ const swapToStandby = (): boolean => {
   return true;
 };
 
-const isStandbyReadyFor = (trackSrc: string): boolean => {
+const gaplessLeadMs = (): number => {
+  const isHidden = typeof document !== 'undefined' && document.hidden;
+  return isHidden ? gaplessLeadMsHidden : gaplessLeadMsVisible;
+};
+
+const standbyReadyThreshold = (): number => {
+  const isHidden = typeof document !== 'undefined' && document.hidden;
+  return isHidden ? HAVE_CURRENT_DATA : HAVE_FUTURE_DATA;
+};
+
+const isStandbyReadyFor = (trackSrc: string, opts?: { allowCurrentData?: boolean }): boolean => {
   if (!standbyElement || !sameSrc(standbyElement.src, trackSrc)) return false;
-  return standbyElement.readyState >= HAVE_CURRENT_DATA;
+  if (standbyElement.error) return false;
+  const threshold = opts?.allowCurrentData ? HAVE_CURRENT_DATA : standbyReadyThreshold();
+  return standbyElement.readyState >= threshold;
 };
 
 const tryAdoptStandby = (trackSrc: string, progress: number, play: boolean, playToken: number): boolean => {
-  if (!isStandbyReadyFor(trackSrc)) return false;
+  // At a hard track change, adopt even with only HAVE_CURRENT_DATA — better than
+  // throwing away the preload and cold-loading the same src.
+  if (!isStandbyReadyFor(trackSrc, { allowCurrentData: true }) || !standbyElement) return false;
+
+  const alreadyPlaying = !standbyElement.paused && !standbyElement.ended;
 
   if (!swapToStandby() || !playerElement) return false;
 
-  if (progress) {
+  lastAdvancedToSrc = trackSrc;
+
+  if (progress && !alreadyPlaying) {
     playerElement.currentTime = progress / 1000;
   }
 
   if (play) {
-    playWhenReady(playerElement, playToken);
-    startHiddenLoadRecovery(playToken);
-    if (typeof document !== 'undefined' && document.hidden) {
-      attemptElementPlay(playerElement, playToken, 0, () => {
-        if (!trackEndPollId) startTrackEndPolling();
-      });
+    if (alreadyPlaying && !playerElement.paused) {
+      startTrackEndPolling();
+      scheduleGaplessTimer();
+    } else {
+      playWhenReady(playerElement, playToken);
+      startHiddenLoadRecovery(playToken);
+      if (typeof document !== 'undefined' && document.hidden) {
+        attemptElementPlay(playerElement, playToken, 0, () => {
+          if (!trackEndPollId) startTrackEndPolling();
+        });
+      }
     }
   } else {
     stopTrackEndPolling();
@@ -296,39 +332,90 @@ const remainingMsOf = (element: HTMLAudioElement | null): number => {
   return (durationSec - element.currentTime) * 1000;
 };
 
-const completeHiddenHandoff = (): boolean => {
-  if (pausedByUser || !nextTrackSrc || !isStandbyReadyFor(nextTrackSrc)) return false;
-  if (playerElement && sameSrc(playerElement.src, nextTrackSrc) && !playerElement.ended) return false;
+const clearGaplessTimer = (): void => {
+  if (gaplessTimerId != null) {
+    window.clearTimeout(gaplessTimerId);
+    gaplessTimerId = null;
+  }
+};
 
-  const finish = (): void => {
-    if (!swapToStandby()) return;
-    setMediaSessionPlaying();
-    ensureAudioKeepAlive();
-    startTrackEndPolling();
+const scheduleGaplessTimer = (): void => {
+  clearGaplessTimer();
+  if (pausedByUser || !playerElement || !nextTrackSrc) return;
+  if (sameSrc(playerElement.src, nextTrackSrc) && !playerElement.ended) return;
+
+  const remaining = remainingMsOf(playerElement);
+  const lead = gaplessLeadMs();
+  if (!Number.isFinite(remaining) || remaining <= 0 || remaining <= lead) return;
+  if (remaining - lead > 180000) return;
+
+  gaplessTimerId = window.setTimeout(() => {
+    gaplessTimerId = null;
+    maybeWarmStartNext();
+  }, remaining - lead);
+};
+
+const alreadyOnSrc = (trackSrc: string | null): boolean => {
+  if (!trackSrc || !playerElement) return false;
+  return sameSrc(playerElement.src, trackSrc) && !playerElement.ended;
+};
+
+const commitGaplessHandoff = (): boolean => {
+  if (pausedByUser || !nextTrackSrc) return false;
+
+  const targetSrc = nextTrackSrc;
+
+  if (!alreadyOnSrc(targetSrc)) {
+    if (!standbyElement || !sameSrc(standbyElement.src, targetSrc)) return false;
+    if (!swapToStandby()) return false;
+  }
+
+  warmStartActive = false;
+  setMediaSessionPlaying();
+  ensureAudioKeepAlive();
+  if (!trackEndPollId) startTrackEndPolling();
+
+  // Redux may already have advanced via `ended` → loadTrack(adopt). A second
+  // auto-next here skips a song (the "track 4 started too early" bug).
+  const alreadyNotified = advanceFired || sameSrc(lastAdvancedToSrc, targetSrc);
+  lastAdvancedToSrc = targetSrc;
+
+  if (!alreadyNotified) {
     requestTrackAdvance();
-  };
+  }
+
+  scheduleGaplessTimer();
+  return true;
+};
+
+const startGaplessHandoff = (): boolean => {
+  if (pausedByUser || !nextTrackSrc || !isStandbyReadyFor(nextTrackSrc)) return false;
+  if (alreadyOnSrc(nextTrackSrc)) return false;
+  if (warmStartActive) return false;
+
+  const next = standbyElement;
+  if (!next) return false;
 
   warmStartActive = true;
   setMediaSessionPlaying();
   ensureAudioKeepAlive();
 
-  if (standbyElement && !standbyElement.paused && !standbyElement.ended) {
-    finish();
-    return true;
+  if (!next.paused && !next.ended) {
+    return commitGaplessHandoff();
   }
 
-  if (!standbyElement) {
-    warmStartActive = false;
-    return false;
-  }
-
-  Promise.resolve(standbyElement.play())
+  Promise.resolve(next.play())
     .then(() => {
       if (pausedByUser) {
         warmStartActive = false;
+        try {
+          next.pause();
+        } catch {
+          // ignore
+        }
         return;
       }
-      finish();
+      commitGaplessHandoff();
     })
     .catch(() => {
       warmStartActive = false;
@@ -340,6 +427,7 @@ export const setNextTrack = (trackSrc: string | null): void => {
   nextTrackSrc = trackSrc;
   if (!trackSrc) {
     preloadedSrc = null;
+    clearGaplessTimer();
     if (standbyElement && standbyElement.paused) {
       try {
         standbyElement.removeAttribute('src');
@@ -351,19 +439,24 @@ export const setNextTrack = (trackSrc: string | null): void => {
     return;
   }
 
-  if (sameSrc(preloadedSrc, trackSrc) || sameSrc(standbyElement?.src, trackSrc)) return;
+  if (sameSrc(preloadedSrc, trackSrc) || sameSrc(standbyElement?.src, trackSrc)) {
+    scheduleGaplessTimer();
+    return;
+  }
 
   const standby = ensureStandbyElement();
   if (!standby) return;
 
   preloadedSrc = trackSrc;
+  standby.preload = 'auto';
   standby.src = trackSrc;
   standby.load();
+  scheduleGaplessTimer();
 };
 
 export const maybeWarmStartNext = (): void => {
   if (pausedByUser || !nextTrackSrc || !playerElement) return;
-  if (sameSrc(playerElement.src, nextTrackSrc) && !playerElement.ended) return;
+  if (alreadyOnSrc(nextTrackSrc)) return;
 
   const remaining = remainingMsOf(playerElement);
   const isHidden = typeof document !== 'undefined' && document.hidden;
@@ -382,7 +475,7 @@ export const maybeWarmStartNext = (): void => {
   if (wrapped) {
     playerElement.loop = false;
     if (standbyReady) {
-      completeHiddenHandoff();
+      startGaplessHandoff();
     } else {
       requestTrackAdvance();
     }
@@ -396,10 +489,12 @@ export const maybeWarmStartNext = (): void => {
     return;
   }
 
-  if (isHidden && remaining <= hiddenHandoffRemainingMs) {
-    if (warmStartActive) return;
-    completeHiddenHandoff();
+  if (remaining <= gaplessLeadMs()) {
+    startGaplessHandoff();
+    return;
   }
+
+  scheduleGaplessTimer();
 };
 
 // ======================================================================
@@ -671,6 +766,9 @@ const isElementAtTrackEnd = (element: HTMLAudioElement): boolean => {
   const durationMs = element.duration * 1000;
   const progressMs = element.currentTime * 1000;
   if (!durationMs || durationMs <= 0 || Number.isNaN(durationMs)) return false;
+  // A brand-new (or just-swapped) element can report a tiny/stale duration.
+  // Never treat the first 1.5s as "ended" unless the element itself did.
+  if (progressMs < minPlayedBeforeEndMs) return false;
 
   return progressMs >= durationMs - trackEndEpsilonMs;
 };
@@ -695,6 +793,7 @@ export const requestTrackAdvance = (): void => {
   if (advanceFired) return;
 
   advanceFired = true;
+  lastAdvancedToSrc = nextTrackSrc;
   stopTrackEndPolling();
   // Keep silent audio pipeline open across the cold-load gap so Tesla does not
   // drop Bluetooth/media focus while the next track buffers.
@@ -803,6 +902,8 @@ export const unload = (opts?: { preserveKeepAlive?: boolean }): void => {
   preloadedSrc = null;
   warmStartActive = false;
   lastKnownCurrentTime = 0;
+  lastAdvancedToSrc = null;
+  clearGaplessTimer();
   advanceFired = false;
   hiddenPlayFailCount = 0;
   stopTrackEndPolling();
@@ -1010,7 +1111,7 @@ export const loadTrack = (trackSrc: string, progress: number = 0, play: boolean 
   lastProgressSampleTime = 0;
   progressHasMoved = false;
   lastKnownCurrentTime = 0;
-  warmStartActive = false;
+  lastAdvancedToSrc = trackSrc;
   const playToken = ++activePlayToken;
 
   if (play) {
@@ -1022,9 +1123,10 @@ export const loadTrack = (trackSrc: string, progress: number = 0, play: boolean 
     playerElement.loop = false;
   }
 
-  // Warm handoff already swapped to this src — do not reload or we create a gap.
+  // Warm / gapless handoff already swapped to this src — do not reload or we
+  // create a gap and stutter at the start of the next song.
   if (playerElement && sameSrc(playerElement.src, trackSrc) && !playerElement.ended) {
-    if (progress) {
+    if (progress && playerElement.paused) {
       playerElement.currentTime = progress / 1000;
     }
     if (play) {
@@ -1034,11 +1136,15 @@ export const loadTrack = (trackSrc: string, progress: number = 0, play: boolean 
       } else if (!trackEndPollId) {
         startTrackEndPolling();
       }
+      scheduleGaplessTimer();
     } else {
       stopTrackEndPolling();
     }
     return;
   }
+
+  warmStartActive = false;
+  clearGaplessTimer();
 
   if (tryAdoptStandby(trackSrc, progress, play, playToken)) {
     return;
@@ -1072,6 +1178,7 @@ export const loadTrack = (trackSrc: string, progress: number = 0, play: boolean 
 export const pause = (): void => {
   pausedByUser = true;
   warmStartActive = false;
+  clearGaplessTimer();
   stopHiddenLoadRecovery();
   stopTrackEndPolling();
   stopAudioKeepAlive();
@@ -1203,12 +1310,20 @@ export const getCurrentDuration = (): number => {
 
 const startTrackEndPolling = (): void => {
   stopTrackEndPolling();
+  trackEndPollMsCurrent = trackEndPollMs;
 
-  trackEndPollId = window.setInterval(() => {
+  const tick = () => {
     const element = getCurrentPlayerElement();
-    if (!element || advanceFired) return;
+    if (!element || advanceFired) {
+      trackEndPollId = window.setTimeout(tick, trackEndPollMsCurrent);
+      return;
+    }
 
     maybeWarmStartNext();
+
+    const remaining = remainingMsOf(element);
+    trackEndPollMsCurrent =
+      Number.isFinite(remaining) && remaining <= nearEndPollRemainingMs ? trackEndNearEndPollMs : trackEndPollMs;
 
     // Also check when paused: Tesla may leave the element paused at track end.
     if (isElementAtTrackEnd(element)) {
@@ -1219,11 +1334,16 @@ const startTrackEndPolling = (): void => {
     if (element.paused && !pausedByUser && element.src) {
       ensureActivePlayback();
     }
-  }, trackEndPollMs);
+
+    trackEndPollId = window.setTimeout(tick, trackEndPollMsCurrent);
+  };
+
+  trackEndPollId = window.setTimeout(tick, trackEndPollMsCurrent);
 };
 
 const stopTrackEndPolling = (): void => {
   if (trackEndPollId) {
+    window.clearTimeout(trackEndPollId);
     window.clearInterval(trackEndPollId);
     trackEndPollId = null;
   }
