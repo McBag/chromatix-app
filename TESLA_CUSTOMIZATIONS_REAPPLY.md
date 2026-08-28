@@ -2,7 +2,7 @@
 
 **Base version:** Chromatix `0.70.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.70.0`  
 **Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0`, `0.68.0`, and `0.70.0`  
-**Last updated:** 2026-08-07 (upstream merge 0.70.0; keep-alive v2 preserved)  
+**Last updated:** 2026-08-13 (pause/resume position + seek/reconnect recovery)  
 **Build system:** Vite 8 + Rolldown (upstream) — **not** CRA  
 **Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)  
 **Routine upgrades:** see **`UPSTREAM_SYNC.md`** (git merge workflow)
@@ -31,7 +31,7 @@ This document describes all Tesla customizations applied on top of stock Chromat
 
 ---
 
-## Tesla static hosting (CRA-compatible layout)
+## Tesla hosting (CRA-compatible layout)
 
 Tesla static hosting expects the **Create React App** deploy tree (as on the live host), **not** Vite’s flat `assets/`:
 
@@ -52,13 +52,13 @@ build/
 
 ### Files
 
-| File                          | Role                                                                                          |
-| ----------------------------- | --------------------------------------------------------------------------------------------- |
-| `package.json`                | `"homepage": "."`, script `"build:win": "node lib/build-win.mjs"`                             |
-| `vite.config.ts`              | `base: './'`; emit into `static/js`, `static/css`, `static/media`                             |
-| `lib/build-win.mjs`           | Sets `VITE_VERSION` / `VITE_DATE`, runs `vite build`, then finalize                           |
-| `lib/finalize-cra-layout.mjs` | Ensures CRA folder layout, relative paths, writes `asset-manifest.json`                       |
-| `index.html`                  | Boot spinner (`#app-boot-loader`), relative `./icon/…`, **no** manifest link (Tesla) |
+| File                          | Role                                                                                                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| `package.json`                | `"homepage": "."`, script `"build:win": "node lib/build-win.mjs"`                                   |
+| `vite.config.ts`              | `base: './'`; emit into `static/js`, `static/css`, `static/media`                                   |
+| `lib/build-win.mjs`           | Sets `VITE_VERSION` / `VITE_DATE`, runs `vite build`, then finalize                                 |
+| `lib/finalize-cra-layout.mjs` | Ensures CRA folder layout, relative paths, writes `asset-manifest.json`                             |
+| `index.html`                  | Boot spinner (`#app-boot-loader`), relative `./icon/…`, **no** manifest link (Tesla static hosting) |
 
 ### Build
 
@@ -70,7 +70,7 @@ npm.cmd run build:win
 
 ### Deploy
 
-Upload the **entire** `build/` folder contents into the host `www` directory (e.g. `/home30/autodownloader/www/`):
+Upload the **entire** `build/` folder contents into the Tesla host `www` directory:
 
 - Replace `index.html`, `static/`, `icon/`, `images/`, `asset-manifest.json`, etc.
 - Do **not** upload only `assets/` from a raw Vite build.
@@ -89,29 +89,38 @@ npx serve -s build -l 4173
 | ---------------------------------- | ------------------------------- | --------------------------------------------- |
 | Tab minimized / `document.hidden`  | **Continues** + auto-next track | **No**                                        |
 | `pagehide` / `freeze` while hidden | **Continues** (poll + nudge)    | **No**                                        |
-| User Pause                         | Stays paused (no auto-resume)   | **No**                                        |
+| User Pause                         | Stays paused (no auto-resume)   | **No** — position is snapshotted              |
+| Network stall / `online` again     | Resume **same** song + position | **No** (reload same `src` at saved time)      |
 | Tab close / navigate away          | Stops                           | **Yes** (`beforeunload` → `playerX.unload()`) |
 
 ### Files
 
-| File                                   | Changes                                                                                                                                                                                                                                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/js/services/player.native.ts`     | Active + standby `<audio>`, next-track preload, **gapless** A/B handoff (~80 ms visible / ~320 ms hidden — not 2.5 s), track-end polling, hidden stall + **zombie** recovery, **dual keep-alive** (Web Audio oscillator + looping near-silent `<audio>`), MediaSession helpers, long hide re-assert (≤2 min) |
-| `src/js/services/player.ts`            | Re-exports Tesla helpers from native (`setTrackEndedCallback`, `nudgeActivePlayback`, `syncHiddenMediaSession`, `handleBecameHidden`, …); still routes DASH vs native                                                                                                                                        |
-| `src/js/store/models.player.js`        | `playerAutoNext`, `addAlbumToQueue`, `playerLoadAdjacentAlbum`, `teslaSetMetadataFromTrack` before load, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload                                                                                                                                   |
-| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; Worker + main interval + cascading timeout when hidden; recovery bursts to 2 min; wall-clock end fallback; **no** pause/unload on hide                                                                                                                                                            |
-| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                                                                                                                                      |
-| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                                                                                                                                             |
-| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden                                                                                                                                                                                                                                                                     |
-| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                                                                                                                                             |
-| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                                                                                                                                 |
+| File                                   | Changes                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/js/services/player.native.ts`     | Active + standby `<audio>`, next-track preload, **gapless** A/B handoff (~80 ms visible / ~320 ms hidden — not 2.5 s), track-end polling, hidden stall + **zombie** recovery, **dual keep-alive**, MediaSession helpers, long hide re-assert (≤2 min), **saved position** + seek restore + mid-track `ended` ignore |
+| `src/js/services/player.dash.ts`       | Same saved-position / seek / false-`ended` recovery as native; `loadTrack(..., durationMs)` from library metadata                                                                                                                                                                                                   |
+| `src/js/services/player.ts`            | Re-exports Tesla helpers from native; routes DASH vs native; passes track `duration`; `recoverToSavedPosition()` on `window.online`                                                                                                                                                                                 |
+| `src/js/store/models.player.js`        | `playerAutoNext`, adjacent-album queue, `_manualPause`, ignore `MEDIA_ERR_ABORTED`, `beforeunload` unload; **persist live progress on pause/seek**; transient `MEDIA_ERR_NETWORK` / `DECODE` retry same track (≤5) instead of skip                                                                                  |
+| `src/js/hooks/usePlaybackKeepAlive.ts` | Always on; Worker + main interval + cascading timeout when hidden; recovery bursts to 2 min; wall-clock end fallback **does not include pause time**; trusted duration (metadata if element duration collapsed); **no** pause/unload on hide                                                                        |
+| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position/`playbackState` only (does **not** rebuild full metadata on poll)                                                                                                                                                                                                                             |
+| `src/js/hooks/useMediaControls.ts`     | MediaSession handlers; **ignore pause while `document.hidden`** (Tesla minimize)                                                                                                                                                                                                                                    |
+| `src/js/hooks/usePlayerProgress.ts`    | 250 ms progress interval when tab hidden; seek uses a ref + slider value on mouse/touch up so the target is not a stale React state                                                                                                                                                                                 |
+| `src/js/components/RangeSlider/`       | `mouseUp` / `touchEnd` pass the live input value into the seek handler                                                                                                                                                                                                                                              |
+| `src/js/utils/trustedDuration.ts`      | Prefer live `HTMLAudioElement.duration` when complete; fall back to library metadata when the element duration collapsed after pause / a dropped connection                                                                                                                                                         |
+| `src/js/hooks/useMediaMeta.ts`         | Uses `teslaSetMetadataFromTrack`                                                                                                                                                                                                                                                                                    |
+| `src/js/app/App.jsx`                   | Calls `usePlaybackKeepAlive()` + `useTeslaOptimization()`; removes boot loader when `inited`                                                                                                                                                                                                                        |
 
 ### Behavior notes
 
-- **Manual pause:** `sessionModel._manualPause` set on `playerPause`; cleared on play/resume/new track list. KeepAlive does not auto-resume after user pause.
-- **Track-end advance:** poll + `ended`; `requestTrackAdvance` latch once per track; callback → `playerAutoNext`.
+- **Manual pause:** `sessionModel._manualPause` set on `playerPause`; cleared on play/resume/new track list. KeepAlive does not auto-resume after user pause. `playerPause` writes the **live** element position into `playingTrackProgress` (not the 30 s-throttled store value).
+- **Pause time is not played time:** `usePlaybackKeepAlive` re-seeds `trackStartRef` on resume from `getPlaybackProgressMs()`. Wall-clock auto-next used to include the pause duration, so a long pause then play near the end skipped to the next song.
+- **Saved position / seek:** native + DASH keep `lastGoodPositionSec` + `pendingSeekSec`. `resume` / `canplay` / `window.online` call `recoverToSavedPosition`. If `currentTime` jumps to 0 or a collapsed duration end, the saved point is restored (reload same `src` if the element `ended` or has an error).
+- **False `ended`:** ignore `ended` when a mid-track position is far from the trusted duration (buffer death / Tesla stream drop). Immediate `ended` at ~0 still advances so broken files do not stall the queue.
+- **Trusted duration:** `resolveTrustedDurationSec` prefers the live element when it looks complete; uses library metadata when the element duration collapsed (buffered length ≈ `currentTime`). Live duration that is only a few seconds longer than metadata is trusted (metadata can be short).
+- **Track-end advance:** poll + `ended`; `requestTrackAdvance` latch once per track; callback → `playerAutoNext`. Wall-clock fallback only in the **last 2 s** (a stall at 85% is a network freeze, not the end).
 - **Gapless A/B:** next src is preloaded on a standby `<audio>`. The next element `play()`s ~80 ms (visible) / ~320 ms (hidden) before the current one ends, then pointers swap. The old 2.5 s hidden warm-start is gone — it started song N+1 early and, after the latch reset in `loadTrack`, could skip another song. `commitGaplessHandoff` will not fire a second auto-next if Redux already adopted the standby. Keep-alive will not wall-clock-advance in the first 2.5 s after a swap.
-- **Playback errors:** ignore `MEDIA_ERR_ABORTED` (intentional `src` change). Errors during load gap can still call `playerAutoNext` so playback does not die after a few songs in background.
+- **Playback errors:** ignore `MEDIA_ERR_ABORTED` (intentional `src` change). `MEDIA_ERR_NETWORK` / `MEDIA_ERR_DECODE` retry the **same** track at the saved position (≤5), including after pause if the user then resumes. Other errors / exhausted retries still `playerAutoNext` so a truly dead file does not freeze the queue. While `_manualPause` is set, a transient error only flags `playerTrackError` and waits for resume.
+- **Seek UI:** `RangeSlider` passes the live input value on mouse/touch up; `usePlayerProgress` keeps a ref so debounce + React state cannot seek to the previous second. `playerProgress` always persists (including while paused).
 - **`useTeslaOptimization`:** only `syncHiddenMediaSession` / nudge — **do not** recreate `MediaMetadata` on the poll (cancels cover image loads).
 - **MediaSession title format:** `"Artist - Title"` via `formatMediaSessionTitle` (real Unicode, no umlaut rewriting).
 
@@ -305,6 +314,7 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 | Path                                   | Purpose                                    |
 | -------------------------------------- | ------------------------------------------ |
 | `src/js/utils/teslaArtworkFix.ts`      | MediaSession title + artwork helper        |
+| `src/js/utils/trustedDuration.ts`      | Live vs metadata duration for track-end    |
 | `src/js/hooks/usePlaybackKeepAlive.ts` | Background multi-song keep-alive           |
 | `src/js/hooks/useTeslaOptimization.ts` | MediaSession position poll                 |
 | `src/js/hooks/useMediaControls.ts`     | MediaSession actions (ignore hidden pause) |
@@ -312,16 +322,16 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 | `src/js/pages/RecentlyAdded.jsx`       | Sidebar page                               |
 | `src/js/pages/RandomAlbums.jsx`        | Sidebar page                               |
 | `lib/build-win.mjs`                    | Windows Vite build                         |
-| `lib/finalize-cra-layout.mjs`          | CRA deploy layout for Tesla static hosting             |
+| `lib/finalize-cra-layout.mjs`          | CRA deploy layout for Tesla static hosting |
 
 ### Patched stock files (high level)
 
-- `src/js/services/player.native.ts`, `player.ts`
+- `src/js/services/player.native.ts`, `player.dash.ts`, `player.ts`
 - `src/js/store/models.player.js`, `models.session.js`
 - `src/js/app/App.jsx`
-- `src/js/hooks/index.js`, `useMediaMeta.ts`, `usePlayerProgress.ts`
-- `src/js/utils/index.ts`, `sortList.ts`
-- `src/js/components/ControlBar/*`, `ViewGrid/*`, `ViewList/*`, `TitleHeading/*`, `SideBar/*`, `SettingsPlayback/*`, `SettingsControls/*`
+- `src/js/hooks/index.js`, `useMediaMeta.ts`, `usePlayerProgress.ts`, `usePlaybackKeepAlive.ts`
+- `src/js/utils/index.ts`, `sortList.ts`, `trustedDuration.ts`
+- `src/js/components/ControlBar/*`, `RangeSlider/*`, `ViewGrid/*`, `ViewList/*`, `TitleHeading/*`, `SideBar/*`, `SettingsPlayback/*`, `SettingsControls/*`
 - `src/js/pages/AlbumDetail.jsx`, `ArtistArray.jsx`
 - `src/js/_config/routes.ts`
 - `src/js/services/bridge.js`
@@ -340,7 +350,7 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 3. Re-apply sections above file-by-file (diff against this tree or Chromatix Cursor for intent).
 4. Ensure Vite `base: './'` + CRA layout finalize still produce `static/{css,js,media}` + `asset-manifest.json`.
 5. Build: `npm.cmd run build:win`
-6. Deploy full `build/` contents to Tesla host `www`.
+6. Deploy full `build/` contents to the Tesla host `www`.
 
 ### Not ported from experimental 0.61 dock work
 
@@ -354,6 +364,7 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - ControlBar left/center/right layout + album line + sizing
 - AlphabetNav + scroll-to-index
 - Background playback without unload on minimize
+- Pause/resume + seek restore the same position after a dropped connection
 - Adjacent-album autoplay with corrected year ordering
 - CRA-compatible deploy layout for Tesla static hosting
 
@@ -365,6 +376,10 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - [ ] `build/` has `static/css`, `static/js`, `static/media`, `asset-manifest.json`, `icon/`, `images/` (no flat `assets/` only)
 - [ ] App loads from deployed `index.html` (boot spinner removed after init)
 - [ ] Play → Pause stays paused (no auto-resume from KeepAlive)
+- [ ] Pause mid-track → wait → resume: **same song, same position** (does not skip)
+- [ ] Pause near the end after a long wait → resume: remaining seconds play (no immediate next)
+- [ ] Seek while paused or playing lands on the slider position
+- [ ] Drop the connection mid-track, then restore it: continues at the **same** point (no skip / no restart at 0)
 - [ ] **Minimized tab:** current track keeps playing
 - [ ] **Minimized tab near track end:** next track starts automatically
 - [ ] **Minimized tab 3+ tracks:** no silent stall after track 2→3 auto-next
