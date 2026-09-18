@@ -27,7 +27,7 @@ Get started at [https://chromatix.app/](https://chromatix.app/)
 
 # 2. License
 
-At the moment the code is open source for transparency, but not for re-distribution in any form. You're of course welcome to download, modify and build the code for personal use.
+At the moment the code is open source for transparency, but not for re-distribution in any form. You’re of course welcome to download, modify and build the code for personal use.
 
 That said, if this repo goes more than 12 months without any commits, take this as advance permission that the code is free to use and distribute without limitation from 12 months after the last commit onwards.
 
@@ -63,7 +63,7 @@ Tanstack Virtual is used for virtualisation of long lists of artists, albums and
 
 The Plex API is entirely undocumented, as far as I can tell, so all Plex API requests are reverse engineered from official Plex clients. They may not be optimised as well as they could be if I had access to official documentation, and include lots of unnecessary data, but they do the job.
 
-All data from the Plex API is transposed into a slightly different format - partly to exclude some data we don't need, partly to make it a bit easier to understand, and partly because I hope to add other services in future and want to make it easier to switch between them with a consistent data structure.
+All data from the Plex API is transposed into a slightly different format - partly to exclude some data we don’t need, partly to make it a bit easier to understand, and partly because I hope to add other services in future and want to make it easier to switch between them with a consistent data structure.
 
 # 6. Code structure
 
@@ -125,11 +125,11 @@ This is also the best place for feature requests and bug reports, as it allows y
 
 # 10. Contributing
 
-I'm not particularly looking for contributors, and hadn't really planned to open source the code base as I'm happy keeping this as a personal side project, but I kept getting requests to open source it for the sake of transparency, so here it is.
+I’m not particularly looking for contributors, and hadn’t really planned to open source the code base as I’m happy keeping this as a personal side project, but I kept getting requests to open source it for the sake of transparency, so here it is.
 
 ## 10.1. Please let me know what you're working on
 
-If you do see something you want to help with, feel free get in touch here on GitHub, on [Reddit](https://www.reddit.com/r/chromatix/), or on [Bluesky](https://bsky.app/profile/chromaticnova.com) with any questions, or to ensure we aren't working on the same things at once.
+If you do see something you want to help with, feel free get in touch here on GitHub, on [Reddit](https://www.reddit.com/r/chromatix/), or on [Bluesky](https://bsky.app/profile/chromaticnova.com) with any questions, or to ensure we aren’t working on the same things at once.
 
 > [!IMPORTANT]
-> I cant guarantee I'll merge in any big features or changes, as I still view this largely as a personal project I want to maintain and control myself, so best to check with me before starting anything.
+> I cant guarantee I’ll merge in any big features or changes, as I still view this largely as a personal project I want to maintain and control myself, so best to check with me before starting anything.
