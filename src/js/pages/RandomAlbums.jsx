@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { ActionToggle, ActionWrap, Loading, TitleHeading, ViewGrid, ViewList } from 'js/components';
 import { useGetAlbumArray } from 'js/hooks';
@@ -23,9 +23,16 @@ const RandomAlbums = () => {
     sortedAlbums: sourceAlbums,
   } = useGetAlbumArray();
 
+  const shuffleKeyRef = useRef('');
+  const shuffledRef = useRef(null);
   const sortedAlbums = useMemo(() => {
     if (!sourceAlbums) return sourceAlbums;
-    return shuffle(sourceAlbums);
+    const key = sourceAlbums.map((album) => album.albumId).join('\0');
+    if (shuffledRef.current && shuffleKeyRef.current === key) return shuffledRef.current;
+    const next = shuffle(sourceAlbums);
+    shuffleKeyRef.current = key;
+    shuffledRef.current = next;
+    return next;
   }, [sourceAlbums]);
 
   const isLoading = !sortedAlbums;

@@ -637,6 +637,11 @@ const effects = (dispatch) => ({
         // [NOTE] bring the stored state up to date with the current state shape - see migrateSessionState for the
         // individual migrations. Each one is a no-op once applied, so this is safe to run on every load.
         localStorageState = migrateSessionState(localStorageState, playingState);
+        // These flags are in-flight playback signals. A reload must not restore
+        // a stuck prefetch or a pause that belongs to a dead page.
+        localStorageState._adjacentAlbumLoading = false;
+        localStorageState._adjacentAlbumPrefetched = false;
+        localStorageState._manualPause = false;
       } catch (error) {
         // browser does not support local storage, or local storage item does not exist
       }
@@ -750,7 +755,7 @@ const effects = (dispatch) => ({
     if (currentServerId !== payload) {
       bridge.abortAllRequests();
       const newServer = rootState.appModel.allServers.find((server) => server.serverId === payload);
-      // [TODO] what if newServer is not found?
+      if (!newServer) return;
       dispatch.sessionModel.setSessionState({
         currentServer: newServer,
         currentLibrary: null,
@@ -858,7 +863,7 @@ const effects = (dispatch) => ({
     if (currentLibraryId !== payload) {
       bridge.abortAllRequests();
       const newLibrary = rootState.appModel.allLibraries.find((library) => library.libraryId === payload);
-      // [TODO] what if newLibrary is not found?
+      if (!newLibrary) return;
       dispatch.sessionModel.setSessionState({
         currentLibrary: newLibrary,
       });

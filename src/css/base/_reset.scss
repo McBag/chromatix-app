@@ -24,7 +24,6 @@ body {
 
 html[data-logged-in='true'],
 html[data-logged-in='true'] body {
-  min-width: 720px;
   background: var(--color-primary-bg);
   overscroll-behavior: none;
 }

@@ -51,8 +51,12 @@ const PlaylistAdd = () => {
         navigate: !seedItem,
       });
       dispatch.dialogModel.closeModal();
-    } catch (_error) {
-      // [TODO] add error handling
+    } catch (error) {
+      console.error(error);
+      dispatch.appModel.addNotification({
+        title: 'Could not create playlist',
+        description: 'Nothing was saved. Check the server and try again.',
+      });
     } finally {
       setLoading(false);
       dispatch.appModel.hideBlocker();

@@ -1101,16 +1101,20 @@ const effects = (dispatch) => {
       });
 
       // update queue tracks
-      const playingTrackList = [...rootState.sessionModel.playingTrackList];
-      playingTrackList.forEach((track) => {
-        if (track.trackId === ratingKey) {
-          track.isFavourite = isFavourite;
-          track.userRating = rating;
-        }
-      });
-      dispatch.sessionModel.setSessionState({
-        playingTrackList,
-      });
+      const sourceList = rootState.sessionModel.playingTrackList;
+      if (sourceList) {
+        const playingTrackList = Array.isArray(sourceList) ? [...sourceList] : { ...sourceList };
+        const tracks = Array.isArray(playingTrackList) ? playingTrackList : Object.values(playingTrackList);
+        tracks.forEach((track) => {
+          if (track?.trackId === ratingKey) {
+            track.isFavourite = isFavourite;
+            track.userRating = rating;
+          }
+        });
+        dispatch.sessionModel.setSessionState({
+          playingTrackList,
+        });
+      }
     },
 
     //

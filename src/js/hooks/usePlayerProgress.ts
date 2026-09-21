@@ -145,6 +145,7 @@ const usePlayerProgress = (options: UsePlayerProgressOptions = {}): UsePlayerPro
   // If a new track is selected, reset track progress
   useEffect(() => {
     if (didMountRef.current) {
+      counterRef.current = 0;
       setTrackProgress(0);
     } else {
       didMountRef.current = true;

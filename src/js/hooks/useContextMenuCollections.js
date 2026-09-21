@@ -43,8 +43,13 @@ const useContextMenuCollections = (collection) => {
             store.dispatch.appModel.showBlocker();
             try {
               await bridge.deleteCollection({ collectionId, type: collectionType });
-            } catch (_error) {
-              // [TODO] add error handling
+            } catch (error) {
+              console.error(error);
+              store.dispatch.appModel.addNotification({
+                title: 'Could not delete collection',
+                description: 'The collection is still there. Check the server and try again.',
+              });
+              throw error;
             } finally {
               store.dispatch.appModel.hideBlocker();
             }

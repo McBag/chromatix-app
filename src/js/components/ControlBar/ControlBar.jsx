@@ -8,13 +8,7 @@ import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 
 import { Favourite, Icon, PopoverMenu, RangeSlider, StarRating, ContextMenuTracks } from 'js/components';
-import {
-  useKeyPlaybackControls,
-  useKeyMediaControls,
-  useMediaControls,
-  useMediaMeta,
-  usePlayerProgress,
-} from 'js/hooks';
+import { useKeyPlaybackControls, useMediaControls, useMediaMeta, usePlayerProgress } from 'js/hooks';
 import { analyticsEvent, durationToStringShort } from 'js/utils';
 import platformFeatures from 'js/_config/platformFeatures';
 
@@ -214,7 +208,6 @@ export const PrimaryControls = ({ fullPageMode }) => {
   }, [trackCurrent]);
 
   useKeyPlaybackControls(controlHandlers);
-  useKeyMediaControls(controlHandlers);
   useMediaControls(controlHandlers);
   useMediaMeta(trackMeta);
 

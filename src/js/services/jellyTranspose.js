@@ -17,6 +17,12 @@ import requiresTranscoding from 'js/utils/requiresTranscoding';
 const thumbSizeSmall = 360;
 const thumbSizeMedium = 680;
 
+const unixSeconds = (value) => {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+};
+
 // ======================================================================
 // HELPERS
 // ======================================================================
@@ -239,7 +245,7 @@ const transposeAlbumData = (album, libraryId, serverBaseUrl, accessToken) => {
     artistId: artistId,
     artistLink: '/libraries/' + libraryId + '/artists/' + artistId,
     genre: album?.Genres?.[0],
-    addedAt: null,
+    addedAt: unixSeconds(album.DateLastMediaAdded) ?? unixSeconds(album.DateCreated),
     lastPlayed: null,
     userRating: null,
     isFavourite: album.UserData?.IsFavorite || false,

@@ -1018,6 +1018,7 @@ export const createPlaylist = ({ title, itemIds, navigate = true }) => {
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Create Playlist');
+      throw error;
     });
 };
 
@@ -1041,6 +1042,7 @@ export const editPlaylist = ({ playlistId, title }) => {
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Edit Playlist');
+      throw error;
     });
 };
 
@@ -1066,6 +1068,7 @@ export const deletePlaylist = ({ playlistId }) => {
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Delete Playlist');
+      throw error;
     });
 };
 
@@ -1178,6 +1181,7 @@ export const movePlaylistItem = ({ playlistId, playlistItemId, afterPlaylistItem
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Move Playlist Item');
+      throw error;
     });
 };
 
@@ -1323,6 +1327,7 @@ export const createCollection = ({ title, type, itemIds }) => {
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Create Collection');
+      throw error;
     });
 };
 
@@ -1345,6 +1350,7 @@ export const editCollection = ({ collectionId, title }) => {
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Edit Collection');
+      throw error;
     });
 };
 
@@ -1371,6 +1377,7 @@ export const deleteCollection = ({ collectionId, type }) => {
     .catch((error) => {
       console.error(error);
       analyticsEvent(toUpperFirst(currentService) + ' / Error / Delete Collection');
+      throw error;
     });
 };
 

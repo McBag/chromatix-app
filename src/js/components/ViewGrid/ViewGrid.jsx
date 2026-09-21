@@ -407,13 +407,15 @@ const ListBodyVirtual = ({
 
   const scrollToEntryIndex = useCallback(
     (index) => {
-      const virtualRowIndex = Math.floor(index / numColumns) + fixedElementCount;
-      rowVirtualizer.scrollToIndex(virtualRowIndex, {
+      // scrollToIndex fights measureElement and then blocks page scrolling.
+      const contentRow = Math.floor(index / numColumns);
+      const scrollOffset = tableHeadHeight + contentRow * rowHeight;
+      rowVirtualizer.scrollToOffset(scrollOffset, {
         align: 'start',
         behavior: 'auto',
       });
     },
-    [rowVirtualizer, numColumns]
+    [rowVirtualizer, numColumns, rowHeight]
   );
 
   useEffect(() => {

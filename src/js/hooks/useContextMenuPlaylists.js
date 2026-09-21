@@ -42,8 +42,13 @@ const useContextMenuPlaylists = (playlist, { showPlay = true } = {}) => {
             store.dispatch.appModel.showBlocker();
             try {
               await bridge.deletePlaylist({ playlistId });
-            } catch (_error) {
-              // [TODO] add error handling
+            } catch (error) {
+              console.error(error);
+              store.dispatch.appModel.addNotification({
+                title: 'Could not delete playlist',
+                description: 'The playlist is still there. Check the server and try again.',
+              });
+              throw error;
             } finally {
               store.dispatch.appModel.hideBlocker();
             }

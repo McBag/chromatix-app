@@ -21,7 +21,7 @@ export const platformFeatures = {
 
     // data fields
     enableCountry: false,
-    enableAddedAt: false,
+    enableAddedAt: true,
     enableLastPlayed: false,
     enableUserRating: false,
     enableIsFavourite: true,

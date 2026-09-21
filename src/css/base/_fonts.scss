@@ -5,8 +5,6 @@
 // FONTS
 // ======================================================================
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
 html,
 body {
   font-size: 16px;
@@ -17,7 +15,6 @@ body {
 
 html[data-logged-in='true'],
 html[data-logged-in='true'] body {
-  min-width: 720px;
   overscroll-behavior: none;
   color: var(--color-text);
 }
@@ -27,14 +24,19 @@ html {
     'GeographWeb',
     -apple-system,
     'SF Pro',
-    'Inter',
     Helvetica,
     Arial,
     sans-serif;
   font-size: 62.5%;
 
   &[data-logged-in='true'] {
-    font-family: -apple-system, 'SF Pro', 'Inter', Helvetica, Arial, sans-serif;
+    font-family:
+      'GeographWeb',
+      -apple-system,
+      'SF Pro',
+      Helvetica,
+      Arial,
+      sans-serif;
   }
 
   // &[data-font-size='larger'] {

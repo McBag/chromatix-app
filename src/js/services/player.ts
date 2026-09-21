@@ -96,6 +96,9 @@ export const unload = (): void => {
  * replicate the routing logic.
  */
 export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolean = true): boolean => {
+  if (play) nativeX.clearManualPauseFlag();
+  else nativeX.setManualPause(true);
+
   const transcoding = requiresTranscoding(track.codec);
   if (transcoding && track.dashSrc && dashX.isSupported()) {
     // Preserve silent Web Audio keep-alive across the native→DASH handoff so
@@ -154,6 +157,9 @@ export const maybeWarmStartNext = (): void => {
 // ======================================================================
 
 export const pause = (): void => {
+  // The pause flag lives on the native module. DASH used to skip it, so a
+  // minimized tab or a reconnect resumed a track the user had paused.
+  nativeX.setManualPause(true);
   if (activePlayer === 'dash') {
     dashX.pause();
   } else {
@@ -170,7 +176,8 @@ export const resume = (): void => {
 };
 
 export const recoverToSavedPosition = (): void => {
-  const play = !nativeX.isManualPause();
+  if (nativeX.isManualPause()) return;
+  const play = true;
   if (activePlayer === 'dash') {
     dashX.recoverToSavedPosition(play);
     return;
@@ -241,6 +248,10 @@ export const requestTrackAdvance = (): void => {
 
 export const clearManualPauseFlag = (): void => {
   nativeX.clearManualPauseFlag();
+};
+
+export const setManualPause = (paused: boolean): void => {
+  nativeX.setManualPause(paused);
 };
 
 export const isManualPause = (): boolean => nativeX.isManualPause();

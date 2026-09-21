@@ -218,8 +218,12 @@ const usePlaylistDrag = ({
         playlistItemId: draggingEntry.playlistItemID,
         afterPlaylistItemId,
       });
-    } catch (_error) {
-      // [TODO] add error handling
+    } catch (error) {
+      console.error(error);
+      dispatchRef.current.appModel.addNotification({
+        title: 'Could not reorder playlist',
+        description: 'The list was left unchanged.',
+      });
     }
 
     dispatchRef.current.appModel.hideBlocker();

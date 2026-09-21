@@ -19,7 +19,6 @@ export { default as useGetPlaylistDetail } from './useGetPlaylistDetail';
 export { default as useGetQueuedTracks } from './useGetQueuedTracks';
 export { default as useGotRequiredData } from './useGotRequiredData';
 export { default as useKeyControl } from './useKeyControl';
-export { default as useKeyMediaControls } from './useKeyMediaControls';
 export { default as useKeyPlaybackControls } from './useKeyPlaybackControls';
 export { default as useMediaControls } from './useMediaControls';
 export { default as useMediaMeta } from './useMediaMeta';

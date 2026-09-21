@@ -24,9 +24,16 @@ export async function readTagsWithEtag(): Promise<TagsWithEtag> {
     const blob = await get(existing.url, { access: 'private', useCache: false });
     const data = await new Response(blob?.stream).json();
 
-    return { tags: Array.isArray(data) ? data : [], etag: existing.etag };
-  } catch {
-    return { tags: [], etag: existing.etag };
+    if (!Array.isArray(data) || data.some((tag) => typeof tag !== 'string')) {
+      throw new Error('Stored tags are not an array of strings');
+    }
+
+    return { tags: data, etag: existing.etag };
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Stored tags are not an array of strings') {
+      throw error;
+    }
+    throw new Error('Failed to read tags', { cause: error });
   }
 }
 

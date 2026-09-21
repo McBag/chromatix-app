@@ -46,8 +46,12 @@ const CollectionEdit = () => {
         title: title.trim(),
       });
       dispatch.dialogModel.closeModal();
-    } catch (_error) {
-      // [TODO] add error handling
+    } catch (error) {
+      console.error(error);
+      dispatch.appModel.addNotification({
+        title: 'Could not rename collection',
+        description: 'The name was left unchanged. Check the server and try again.',
+      });
     } finally {
       setLoading(false);
       dispatch.appModel.hideBlocker();

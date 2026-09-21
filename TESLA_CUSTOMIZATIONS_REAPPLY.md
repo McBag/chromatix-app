@@ -245,7 +245,7 @@ Buttons are locked with `flex: 0 0 auto`, `min/max-width/height`, `aspect-ratio:
 
 AlphabetNav sits in a reserved 36px gutter so letters no longer overlay artist cards.
 
-Hooks: `useMediaControls` + `useKeyMediaControls` + `useMediaMeta`.
+Hooks: `useMediaControls` + `useMediaMeta`.
 
 ---
 

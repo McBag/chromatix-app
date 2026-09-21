@@ -2,6 +2,7 @@
 // IMPORTS
 // ======================================================================
 
+import { useEffect, useRef } from 'react';
 import debounce from 'lodash/debounce';
 import clsx from 'clsx';
 
@@ -26,7 +27,11 @@ export const RangeSlider = ({
 }) => {
   const widthPercent = ((value - min) / (max - min)) * 100;
 
-  const debouncedHandleChange = debounce(handleChange, 10);
+  const handleChangeRef = useRef(handleChange);
+  handleChangeRef.current = handleChange;
+  const debouncedHandleChange = useRef(debounce((next) => handleChangeRef.current?.(next), 10)).current;
+
+  useEffect(() => () => debouncedHandleChange.cancel(), [debouncedHandleChange]);
 
   return (
     <div className={style.wrap}>

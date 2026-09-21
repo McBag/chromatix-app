@@ -28,9 +28,12 @@ const Confirmation = () => {
       setYesLoading(true);
       try {
         await Promise.resolve(yesCallback(callbackData));
-      } finally {
+      } catch (error) {
+        console.error(error);
         setYesLoading(false);
+        return;
       }
+      setYesLoading(false);
     }
     dispatch.dialogModel.closeConfirm();
   };

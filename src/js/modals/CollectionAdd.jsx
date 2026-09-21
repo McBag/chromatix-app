@@ -38,8 +38,12 @@ const CollectionAdd = () => {
         itemIds: [currentModalData.itemId],
       });
       dispatch.dialogModel.closeModal();
-    } catch (_error) {
-      // [TODO] add error handling
+    } catch (error) {
+      console.error(error);
+      dispatch.appModel.addNotification({
+        title: 'Could not create collection',
+        description: 'Nothing was saved. Check the server and try again.',
+      });
     } finally {
       setLoading(false);
       dispatch.appModel.hideBlocker();

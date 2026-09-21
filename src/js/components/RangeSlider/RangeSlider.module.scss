@@ -29,7 +29,7 @@
     // annoyingly these must be duplicated, and
     // won't work if you comma separate them
     &::-webkit-slider-thumb {
-      display: none;
+      display: block;
       appearance: none !important;
       box-sizing: border-box;
       width: 12px;
@@ -44,7 +44,7 @@
       cursor: pointer;
     }
     &::-moz-range-thumb {
-      display: none;
+      display: block;
       appearance: none !important;
       box-sizing: border-box;
       width: 12px;
@@ -59,7 +59,7 @@
       cursor: pointer;
     }
     &::-ms-thumb {
-      display: none;
+      display: block;
       appearance: none !important;
       box-sizing: border-box;
       width: 12px;

@@ -2,7 +2,7 @@
 // OPTIONS
 // ======================================================================
 
-import { resolveTrustedDurationSec } from 'js/utils/trustedDuration';
+import { endedAtDecodedDuration, resolveTrustedDurationSec } from 'js/utils/trustedDuration';
 
 const trackEndPollMs = 250;
 const trackEndNearEndPollMs = 50;
@@ -66,6 +66,7 @@ let expectedDurationSec = 0;
 let pendingSeekSec: number | null = null;
 let lastAdvancedToSrc: string | null = null;
 let gaplessTimerId: number | null = null;
+let gaplessGeneration = 0;
 let trackEndPollMsCurrent = trackEndPollMs;
 let onLoadStartCb: () => void = () => undefined;
 let onCanPlayCb: () => void = () => undefined;
@@ -163,6 +164,12 @@ const setupPlayerElement = (element: HTMLAudioElement, volumeLevel: number, volu
   });
   element.addEventListener('ended', () => {
     if (!isActivePlayer(element)) return;
+    // Real EOF, including when tags are a few seconds longer than the file.
+    // A collapsed buffer still looks "ended" at a short duration — that one recovers.
+    if (elementReachedDecodedEnd(element)) {
+      requestTrackAdvance();
+      return;
+    }
     // The event means the element thinks it finished. Ignore it only when we
     // already have a mid-track position that is not near the trusted duration
     // (buffer death / dropped connection). Immediate ended at 0 still advances.
@@ -419,16 +426,29 @@ const startGaplessHandoff = (): boolean => {
   const next = standbyElement;
   if (!next) return false;
 
+  const generation = gaplessGeneration;
+  const expectedSrc = nextTrackSrc;
   warmStartActive = true;
   setMediaSessionPlaying();
   ensureAudioKeepAlive();
 
+  const stillCurrent = (): boolean =>
+    generation === gaplessGeneration && sameSrc(nextTrackSrc, expectedSrc) && sameSrc(next.src, expectedSrc);
+
   if (!next.paused && !next.ended) {
+    if (!stillCurrent()) {
+      warmStartActive = false;
+      return false;
+    }
     return commitGaplessHandoff();
   }
 
   Promise.resolve(next.play())
     .then(() => {
+      if (!stillCurrent()) {
+        warmStartActive = false;
+        return;
+      }
       if (pausedByUser) {
         warmStartActive = false;
         try {
@@ -441,12 +461,15 @@ const startGaplessHandoff = (): boolean => {
       commitGaplessHandoff();
     })
     .catch(() => {
-      warmStartActive = false;
+      if (generation === gaplessGeneration) warmStartActive = false;
     });
   return true;
 };
 
 export const setNextTrack = (trackSrc: string | null): void => {
+  if (!sameSrc(nextTrackSrc, trackSrc)) {
+    gaplessGeneration += 1;
+  }
   nextTrackSrc = trackSrc;
   if (!trackSrc) {
     preloadedSrc = null;
@@ -489,11 +512,12 @@ export const maybeWarmStartNext = (): void => {
     playerElement.loop = true;
   }
 
-  const nearPreviousEnd =
-    lastKnownCurrentTime > 0 && playerElement.duration > 0 && lastKnownCurrentTime > playerElement.duration - 3;
-  const wrapped = Boolean(playerElement.loop && nearPreviousEnd && playerElement.currentTime < 3);
+  // Any backward jump while looping is the wrap. A throttled Tesla timer often
+  // skips the old "previous sample was inside the last 3s" window.
+  const current = playerElement.currentTime || 0;
+  const wrapped = Boolean(playerElement.loop && lastKnownCurrentTime > 1 && current + 0.5 < lastKnownCurrentTime);
 
-  lastKnownCurrentTime = playerElement.currentTime || 0;
+  lastKnownCurrentTime = current;
 
   if (wrapped) {
     playerElement.loop = false;
@@ -802,18 +826,42 @@ const snapshotElementPosition = (element: HTMLAudioElement | null): void => {
   lastGoodPositionSec = timeSec;
 };
 
+const retireStalePendingSeek = (currentTime: number): void => {
+  if (pendingSeekSec == null) return;
+  // Playback has moved on. A later canplay must not jump back to the old seek.
+  if (currentTime > pendingSeekSec + positionDriftSec) {
+    pendingSeekSec = null;
+  }
+};
+
 const applyPendingSeek = (element: HTMLAudioElement): void => {
   if (pendingSeekSec == null) return;
   const target = pendingSeekSec;
-  if (Math.abs((element.currentTime || 0) - target) > positionDriftSec) {
+  const current = element.currentTime || 0;
+  retireStalePendingSeek(current);
+  if (pendingSeekSec == null) return;
+
+  if (Math.abs(current - target) > positionDriftSec) {
     try {
       element.currentTime = target;
     } catch {
-      // not seekable yet
+      return;
     }
   }
-  lastGoodPositionSec = target;
+  if (Math.abs((element.currentTime || 0) - target) <= positionDriftSec) {
+    pendingSeekSec = null;
+    lastGoodPositionSec = target;
+  }
 };
+
+const elementReachedDecodedEnd = (element: HTMLAudioElement): boolean =>
+  endedAtDecodedDuration({
+    ended: element.ended,
+    elementDurationSec: element.duration,
+    positionSec: Number.isFinite(element.currentTime) ? element.currentTime : lastGoodPositionSec,
+    expectedDurationSec,
+    lastGoodPositionSec,
+  });
 
 const shouldTreatAsTrackEnd = (element: HTMLAudioElement): boolean => {
   if (isElementAtTrackEnd(element)) return true;
@@ -830,9 +878,7 @@ const isElementAtTrackEnd = (element: HTMLAudioElement): boolean => {
   const durationMs = trusted * 1000;
 
   if (element.ended) {
-    if (durationMs > 0 && progressMs < durationMs - 1000) return false;
-    if (durationMs > 0 && progressMs >= durationMs - 1000) return true;
-    return !progressHasMoved && lastGoodPositionSec < 1.5;
+    return elementReachedDecodedEnd(element);
   }
 
   if (!durationMs || durationMs <= 0 || Number.isNaN(durationMs)) return false;
@@ -846,8 +892,10 @@ const isElementAtTrackEnd = (element: HTMLAudioElement): boolean => {
 export const recoverToSavedPosition = (play: boolean = true): void => {
   const element = getCurrentPlayerElement();
   if (!element?.src) return;
+  if (pausedByUser && !play) return;
   if (shouldTreatAsTrackEnd(element)) return;
 
+  retireStalePendingSeek(element.currentTime || 0);
   const target = pendingSeekSec != null ? pendingSeekSec : lastGoodPositionSec;
   const needsReload = Boolean(element.ended || element.error || element.readyState < 1);
 
@@ -876,6 +924,10 @@ export const recoverToSavedPosition = (play: boolean = true): void => {
     } catch {
       pendingSeekSec = target;
     }
+  }
+
+  if (pendingSeekSec != null && Math.abs((element.currentTime || 0) - target) <= positionDriftSec) {
+    pendingSeekSec = null;
   }
 
   if (play && !pausedByUser) {
@@ -1215,6 +1267,21 @@ const playWhenReady = (element: HTMLAudioElement, playToken: number): void => {
   beginPlaybackWhenReady(element, playToken, () => startPlaybackWithRetry(element, playToken));
 };
 
+export const setManualPause = (paused: boolean): void => {
+  pausedByUser = paused;
+  if (!paused) return;
+  warmStartActive = false;
+  gaplessGeneration += 1;
+  clearGaplessTimer();
+  stopHiddenLoadRecovery();
+  stopTrackEndPolling();
+  stopAudioKeepAlive();
+  if (playerElement) playerElement.loop = false;
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = 'paused';
+  }
+};
+
 export const loadTrack = (
   trackSrc: string,
   progress: number = 0,
@@ -1222,6 +1289,7 @@ export const loadTrack = (
   durationMs: number = 0
 ): void => {
   console.log('%c--- player - loadTrack ---', 'color:#a18507');
+  gaplessGeneration += 1;
   stopHiddenLoadRecovery();
   resetTrackAdvanceLatch();
   hiddenPlayFailCount = 0;
@@ -1246,7 +1314,9 @@ export const loadTrack = (
 
   // Warm / gapless handoff already swapped to this src — do not reload or we
   // create a gap and stutter at the start of the next song.
-  if (playerElement && sameSrc(playerElement.src, trackSrc) && !playerElement.ended) {
+  // A network/decode error leaves src in place. Reloading is the retry; play() on
+  // the broken element fails and the queue then skips the song.
+  if (playerElement && sameSrc(playerElement.src, trackSrc) && !playerElement.ended && !playerElement.error) {
     if (progress) {
       playerElement.currentTime = progress / 1000;
       lastGoodPositionSec = progress / 1000;
@@ -1298,22 +1368,13 @@ export const loadTrack = (
 };
 
 export const pause = (): void => {
-  pausedByUser = true;
-  warmStartActive = false;
-  clearGaplessTimer();
-  stopHiddenLoadRecovery();
-  stopTrackEndPolling();
-  stopAudioKeepAlive();
   snapshotElementPosition(playerElement);
+  setManualPause(true);
   if (playerElement) {
-    playerElement.loop = false;
     playerElement.pause();
   }
   if (standbyElement) {
     standbyElement.pause();
-  }
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.playbackState = 'paused';
   }
 };
 
@@ -1409,9 +1470,13 @@ export const ensureActivePlayback = (): void => {
 
 export const restart = (): void => {
   lastGoodPositionSec = 0;
-  pendingSeekSec = 0;
+  pendingSeekSec = null;
   if (playerElement) {
-    playerElement.currentTime = 0;
+    try {
+      playerElement.currentTime = 0;
+    } catch {
+      pendingSeekSec = 0;
+    }
     playerElement.play().catch((_error: any) => null);
   }
 };

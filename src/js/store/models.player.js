@@ -55,7 +55,7 @@ const getAlbumSortYear = (album) => {
     const match = String(album.releaseDate).match(/^(\d{4})/);
     if (match) return Number(match[1]);
   }
-  return 0;
+  return null;
 };
 
 const resolveArtistIdFromTrack = (track, rootState) => {
@@ -75,8 +75,15 @@ const sortAlbumsByReleaseYearAsc = (albums) =>
   [...albums].sort((a, b) => {
     const aYear = getAlbumSortYear(a);
     const bYear = getAlbumSortYear(b);
+    const titleCompare = String(a.title || '').localeCompare(String(b.title || ''), undefined, {
+      sensitivity: 'base',
+    });
+    if (aYear == null && bYear == null) return titleCompare;
+    // Undated albums sort last so "previous album" stops at the oldest dated one.
+    if (aYear == null) return 1;
+    if (bYear == null) return -1;
     if (aYear !== bYear) return aYear - bYear;
-    return String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' });
+    return titleCompare;
   });
 
 /**
@@ -420,17 +427,22 @@ const effects = (dispatch) => ({
     // Display notification
     dispatch.appModel.addNotification({
       title: 'Playback error',
-      description: PlaybackErrorMessage({ trackTitle: trackCurrent.title, trackArtist: trackCurrent.artist }),
+      description: PlaybackErrorMessage({
+        trackTitle: trackCurrent?.title || 'Unknown title',
+        trackArtist: trackCurrent?.artist || 'Unknown artist',
+      }),
     });
 
     // Try to play the next track (after a short delay)
     if (payload) {
-      const isLastTrack = playingTrackIndex === playingTrackKeys.length - 1;
+      const isLastTrack = playingTrackIndex === playingTrackKeys?.length - 1;
       const playingRepeatAll = rootState.sessionModel.playingRepeatAll;
       const playingRepeatOnce = rootState.sessionModel.playingRepeatOnce;
-      if (isLastTrack && (playingRepeatAll || playingRepeatOnce)) {
+      // Repeat-1 would reload this same broken file forever. Drop it, and drop
+      // repeat-all only when there is no later track to move to.
+      if (playingRepeatOnce || (isLastTrack && playingRepeatAll)) {
         dispatch.sessionModel.setSessionState({
-          playingRepeatAll: false,
+          ...(isLastTrack ? { playingRepeatAll: false } : {}),
           playingRepeatOnce: false,
         });
       }
@@ -626,6 +638,7 @@ const effects = (dispatch) => ({
       playingTrackCount: currentAlbumTracks.length,
       playingTrackProgress: 0,
       playingShuffle: isShuffle,
+      _adjacentAlbumLoading: false,
       _adjacentAlbumPrefetched: false,
       _lastQueuedAlbumId: null,
     });
@@ -782,14 +795,16 @@ const effects = (dispatch) => ({
           playerTrackLoaded: true,
           playerTrackError: false,
         });
+        const indexChanged = index !== playingTrackIndex;
         dispatch.sessionModel.setSessionState({
           playingTrackIndex: index,
-          ...(play ? { _manualPause: false } : {}),
+          ...(progress != null ? { playingTrackProgress: progress } : indexChanged ? { playingTrackProgress: 0 } : {}),
+          ...(play ? { _manualPause: false } : { _manualPause: true }),
           ...(trackAlbumId != null
             ? {
                 playingAlbumId: trackAlbumId,
                 playingArtistId: resolvedArtistId || rootState.sessionModel.playingArtistId,
-                ...(albumChanged ? { _adjacentAlbumPrefetched: false } : {}),
+                ...(albumChanged ? { _adjacentAlbumPrefetched: false, _adjacentAlbumLoading: false } : {}),
               }
             : {}),
         });
@@ -797,6 +812,8 @@ const effects = (dispatch) => ({
         if (play) {
           playerX.clearManualPauseFlag();
           teslaSetMetadataFromTrack(currentTrack);
+        } else {
+          playerX.setManualPause(true);
         }
         const trackLoaded = playerX.loadTrack(trackWithDash, progress, play);
         if (!trackLoaded) {
@@ -835,8 +852,11 @@ const effects = (dispatch) => ({
         }
       }
     } catch (error) {
-      // this catches older users before shuffle was implemented
-      dispatch.sessionModel.unloadTrack();
+      console.error('playerLoadIndex failed', error);
+      dispatch.playerModel.setPlayerState({
+        playerPlaying: false,
+        playerTrackError: true,
+      });
     }
   },
 
@@ -1056,14 +1076,20 @@ const effects = (dispatch) => ({
     const playingTrackCount = rootState.sessionModel.playingTrackCount;
     const isShuffle = !playingShuffle;
 
-    const realIndex = rootState.sessionModel.playingTrackKeys[playingTrackIndex];
-    const trackKeys = getTrackKeys(playingTrackCount, playingOrder, isShuffle, realIndex);
+    const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
+    const realIndex = playingTrackKeys?.[playingTrackIndex];
+    const order =
+      Array.isArray(playingOrder) && playingTrackKeys && playingOrder.length === playingTrackKeys.length
+        ? playingOrder
+        : null;
+    const trackKeys = getTrackKeys(playingTrackKeys?.length || playingTrackCount, order, isShuffle, realIndex);
     const newIndex = trackKeys.indexOf(realIndex);
 
     dispatch.sessionModel.setSessionState({
       playingShuffle: isShuffle,
-      playingTrackIndex: newIndex,
+      playingTrackIndex: newIndex === -1 ? playingTrackIndex : newIndex,
       playingTrackKeys: trackKeys,
+      playingTrackCount: trackKeys.length,
     });
 
     // Update the next track based on new order
@@ -1175,10 +1201,24 @@ const effects = (dispatch) => ({
       newList[key] = track;
     });
 
+    const playingOrder = rootState.sessionModel.playingOrder;
+    let nextOrder = playingOrder;
+    if (Array.isArray(playingOrder)) {
+      const addedKeys = tracks.map((_, offset) => startKey + offset);
+      if (rootState.sessionModel.playingShuffle) {
+        nextOrder = [...playingOrder, ...addedKeys];
+      } else {
+        nextOrder = [...playingOrder];
+        const orderInsertAt = Math.min(Math.max(insertAt, 0), nextOrder.length);
+        nextOrder.splice(orderInsertAt, 0, ...addedKeys);
+      }
+    }
+
     dispatch.sessionModel.setSessionState({
       playingTrackList: newList,
       playingTrackKeys: newKeys,
       playingTrackCount: newKeys.length,
+      ...(Array.isArray(nextOrder) ? { playingOrder: nextOrder } : {}),
       _lastQueuedAlbumId: albumId,
     });
     dispatch.playerModel.updateNextTrack();
@@ -1234,8 +1274,11 @@ const effects = (dispatch) => ({
       holdMediaFocus();
       if (attempt < 40) {
         window.setTimeout(() => dispatch.playerModel.playerAutoNext({ attempt: attempt + 1 }), 350);
+        return;
       }
-      return;
+      // The fetch never finished. Drop the flag and continue, otherwise the
+      // album ends in silence and the advance latch stays shut.
+      dispatch.sessionModel.setSessionState({ _adjacentAlbumLoading: false });
     }
 
     if (autoPlayPreviousAlbumOnAlbumEnd) {
@@ -1258,7 +1301,7 @@ const effects = (dispatch) => ({
     if (rootState.sessionModel._adjacentAlbumPrefetched) return;
     if (rootState.sessionModel.playingRepeatAll || rootState.sessionModel.playingRepeatOnce) return;
 
-    const libraryId = rootState.sessionModel.currentLibrary?.libraryId;
+    const libraryId = rootState.sessionModel.playingLibraryId || rootState.sessionModel.currentLibrary?.libraryId;
     const playingTrackList = rootState.sessionModel.playingTrackList;
     const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
     const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
@@ -1350,7 +1393,7 @@ const effects = (dispatch) => ({
    */
   async playerLoadAdjacentAlbum(payload, rootState) {
     const attempt = typeof payload === 'object' && payload?.attempt != null ? payload.attempt : 0;
-    const libraryId = rootState.sessionModel.currentLibrary?.libraryId;
+    const libraryId = rootState.sessionModel.playingLibraryId || rootState.sessionModel.currentLibrary?.libraryId;
     const playingTrackList = rootState.sessionModel.playingTrackList;
     const playingTrackKeys = rootState.sessionModel.playingTrackKeys;
     const playingTrackIndex = rootState.sessionModel.playingTrackIndex;
