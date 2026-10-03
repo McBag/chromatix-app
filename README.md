@@ -2,7 +2,7 @@
 
 Tesla-optimized fork of [Chromatix](https://github.com/chromatix-app/chromatix-app), a web music player for Plex and Jellyfin.
 
-This tree is based on Chromatix **0.70.0**. Tesla-oriented behaviour is the default everywhere: there is no user-agent sniffing and no `html[data-is-tesla]` flag at runtime.
+This tree is based on Chromatix **0.71.0**. Tesla-oriented behaviour is the default everywhere: there is no user-agent sniffing and no `html[data-is-tesla]` flag at runtime.
 
 Official Chromatix: [chromatix.app](https://chromatix.app/)
 
