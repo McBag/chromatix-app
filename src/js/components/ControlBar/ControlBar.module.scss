@@ -42,7 +42,8 @@
   }
 
   a {
-    &:hover {
+    &:hover,
+    &:focus-visible {
       text-decoration: underline;
     }
   }
@@ -308,7 +309,8 @@ span.settings,
     cursor: default;
   }
 
-  &:not(:disabled):hover {
+  &:not(:disabled):hover,
+  &:not(:disabled):focus-visible {
     background: var(--color-secondary-hover);
 
     .fullPageMode & {
