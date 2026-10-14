@@ -2,7 +2,7 @@
 // IMPORTS
 // ======================================================================
 
-import { PageHome, PageLanding } from 'js/components';
+import { PageLanding, PageLogin } from 'js/components';
 import { getEnvironment } from 'js/utils';
 
 const envData = getEnvironment();
@@ -12,7 +12,7 @@ const envData = getEnvironment();
 // ======================================================================
 
 const Home = () => {
-  return envData.isElectron ? <PageLanding /> : <PageHome />;
+  return envData.isElectron ? <PageLanding /> : <PageLogin />;
 };
 
 // ======================================================================
