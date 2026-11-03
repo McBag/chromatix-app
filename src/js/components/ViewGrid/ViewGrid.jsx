@@ -9,6 +9,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
 
 import {
+  ArtworkImage,
   ContextMenuAlbums,
   ContextMenuArtists,
   ContextMenuCollections,
@@ -808,7 +809,7 @@ const ListEntry = React.memo(
         {/* Thumbnail */}
         <div className={clsx(style.thumb, { [style.thumbSquare]: isSquareCard, [style.thumbWithIcon]: isIconCard })}>
           {/* Artwork */}
-          {thumbSm && <img src={thumbSm} alt={title} draggable="false" loading="lazy" />}
+          <ArtworkImage src={thumbSm} alt={title} loading="lazy" />
 
           {/* Tag image */}
           {tagImageSrc && (

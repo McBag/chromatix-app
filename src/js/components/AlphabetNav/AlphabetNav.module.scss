@@ -59,8 +59,8 @@
   }
 
   &:hover:not(:disabled) {
-    background: var(--color-core);
-    color: var(--color-primary-background);
+    background: var(--color-core-main);
+    color: var(--color-core-on-primary-text);
   }
 
   &Disabled,

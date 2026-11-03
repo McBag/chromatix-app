@@ -93,7 +93,7 @@ const PlaylistAdd = () => {
         <Button onClick={handleSubmit} size="small" color="mono" disabled={!!validationError} loading={loading}>
           Create Playlist
         </Button>
-        <Button onClick={() => dispatch.dialogModel.closeModal()} size="small" color="tertiary" disabled={loading}>
+        <Button onClick={() => dispatch.dialogModel.closeModal()} size="small" color="onSecondary" disabled={loading}>
           Cancel
         </Button>
       </div>

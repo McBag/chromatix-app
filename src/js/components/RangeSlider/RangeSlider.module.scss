@@ -136,13 +136,16 @@
   background: var(--color-text);
   border-radius: 99px;
 
-  .input:hover &,
-  .input:focus & {
-    background: var(--color-core);
+  .colorPrimary:hover &,
+  .colorPrimary:focus &,
+  .colorPrimary.inputAccessible & {
+    background: var(--color-slider-on-primary-fill);
   }
 
-  .inputAccessible & {
-    background: var(--color-core);
+  .colorSecondary:hover &,
+  .colorSecondary:focus &,
+  .colorSecondary.inputAccessible & {
+    background: var(--color-slider-on-secondary-fill);
   }
 
   .inputDisabled & {
@@ -152,7 +155,7 @@
 }
 
 .inputDisabled {
-  opacity: var(--opacity-04);
+  opacity: var(--opacity-disabled);
   pointer-events: none;
 }
 

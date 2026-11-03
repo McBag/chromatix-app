@@ -3,9 +3,12 @@
 // ======================================================================
 
 import { PlaybackErrorMessage } from 'js/components';
+import config from 'js/_config/config';
 import {
   analyticsEvent,
   getDashSrc,
+  getJellyStreamSrc,
+  getLocalStorage,
   getTrackKeys,
   requiresTranscoding,
   sortList,
@@ -750,7 +753,7 @@ const effects = (dispatch) => ({
     const sessionId = rootState.sessionModel.sessionId;
     const currentTrack = payload.playingTrackList[payload.playingTrackKeys[payload.playingTrackIndex]];
     teslaSetMetadataFromTrack(currentTrack);
-    playerX.loadTrack(withDashSrc(currentTrack, currentService, serverBaseUrl, userToken, sessionId));
+    playerX.loadTrack(withPlaybackSrc(currentTrack, currentService, serverBaseUrl, userToken, sessionId));
     playerX.nudgeActivePlayback();
     dispatch.playerModel.updateNextTrack();
 
@@ -780,7 +783,7 @@ const effects = (dispatch) => ({
         const serverBaseUrl = rootState.appModel.serverBaseUrl;
         const userToken = rootState.appModel.userToken;
         const sessionId = rootState.sessionModel.sessionId;
-        const trackWithDash = withDashSrc(currentTrack, currentService, serverBaseUrl, userToken, sessionId);
+        const trackWithDash = withPlaybackSrc(currentTrack, currentService, serverBaseUrl, userToken, sessionId);
 
         // Keep playingAlbumId / playingArtistId in sync when the queue spans albums
         // (e.g. after addAlbumToQueue / adjacent autoplay).
@@ -1135,7 +1138,7 @@ const effects = (dispatch) => ({
     const serverBaseUrl = rootState.appModel.serverBaseUrl;
     const userToken = rootState.appModel.userToken;
     const sessionId = rootState.sessionModel.sessionId;
-    playerX.setNextTrack(withDashSrc(nextTrack, currentService, serverBaseUrl, userToken, sessionId));
+    playerX.setNextTrack(withPlaybackSrc(nextTrack, currentService, serverBaseUrl, userToken, sessionId));
   },
 
   async addAlbumToQueue(payload, rootState) {
@@ -1573,9 +1576,17 @@ const toUpperFirst = (string) => {
   return string?.charAt(0).toUpperCase() + string?.slice(1);
 };
 
-// Adds a freshly computed dashSrc to a track if the current service is Plex
-// and the necessary connection details are available.
-const withDashSrc = (track, currentService, serverBaseUrl, accessToken, sessionId) => {
+// Prepares a track for playback using the current connection details, since a restored queue may
+// predate the current login. Plex gets a freshly computed dashSrc; Jellyfin gets the current access
+// token added to its src (replacing any stale one from a queue saved before tokens were left out).
+// Jellyfin's token is read from storage, as jellyTools does, since the passed-in accessToken is
+// Plex's home user token and is null for Jellyfin.
+const withPlaybackSrc = (track, currentService, serverBaseUrl, accessToken, sessionId) => {
+  if (currentService === 'jellyfin') {
+    const jellyToken = getLocalStorage(config.storageTokenKey);
+    if (!track?.src || !jellyToken) return track;
+    return { ...track, src: getJellyStreamSrc(track.src, jellyToken) };
+  }
   if (currentService !== 'plex' || !track?.trackKey || !serverBaseUrl || !accessToken || !sessionId) {
     return track;
   }
@@ -1583,7 +1594,7 @@ const withDashSrc = (track, currentService, serverBaseUrl, accessToken, sessionI
 };
 
 // Redacts sensitive query params from a URL string before logging.
-const REDACTED_PARAMS = ['X-Plex-Token', 'X-Emby-Token', 'api_key', 'token'];
+const REDACTED_PARAMS = ['X-Plex-Token', 'X-Emby-Token', 'ApiKey', 'api_key', 'token'];
 const redactUrl = (url) => {
   try {
     const parsed = new URL(url);
