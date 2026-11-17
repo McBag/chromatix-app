@@ -670,6 +670,8 @@ const ListEntry = React.memo(
           ? `/libraries/${currentLibraryId}/artists/${artistId}`
           : null);
 
+    const optionCircularArtistImages = useSelector(({ sessionModel }) => sessionModel.optionCircularArtistImages);
+
     // Play button handler
     const handlePlay = useCallback(
       (event) => {
@@ -788,6 +790,8 @@ const ListEntry = React.memo(
     const isCollection = variant === 'collections';
     const isTrack = variant === 'folders' && !!trackId;
 
+    const isCircle = isArtist && optionCircularArtistImages;
+
     // Tag image thumbnails
     const [tagImageSrc, handleTagImageError] = useTagImage(title, isIconCard && variant !== 'folders');
 
@@ -807,21 +811,29 @@ const ListEntry = React.memo(
         tabIndex={0}
       >
         {/* Thumbnail */}
-        <div className={clsx(style.thumb, { [style.thumbSquare]: isSquareCard, [style.thumbWithIcon]: isIconCard })}>
-          {/* Artwork */}
-          <ArtworkImage src={thumbSm} alt={title} loading="lazy" />
+        <div className={style.thumbWrap}>
+          <div
+            className={clsx(style.thumb, {
+              [style.thumbSquare]: isSquareCard,
+              [style.thumbWithIcon]: isIconCard,
+              [style.thumbCircle]: isCircle,
+            })}
+          >
+            {/* Artwork */}
+            <ArtworkImage src={thumbSm} alt={title} loading="lazy" />
 
-          {/* Tag image */}
-          {tagImageSrc && (
-            <img src={tagImageSrc} alt={title} draggable="false" loading="lazy" onError={handleTagImageError} />
-          )}
+            {/* Tag image */}
+            {tagImageSrc && (
+              <img src={tagImageSrc} alt={title} draggable="false" loading="lazy" onError={handleTagImageError} />
+            )}
 
-          {/* Icon */}
-          {isIconCard && !tagImageSrc && (
-            <div className={style.icon}>
-              <Icon icon={iconImage} cover stroke strokeWidth={1.6} />
-            </div>
-          )}
+            {/* Icon */}
+            {isIconCard && !tagImageSrc && (
+              <div className={style.icon}>
+                <Icon icon={iconImage} cover stroke strokeWidth={1.6} />
+              </div>
+            )}
+          </div>
 
           {(variant === 'albums' || variant === 'artistAlbums') && (
             <div className={style.moreButtonWrap}>

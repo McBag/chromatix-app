@@ -868,6 +868,9 @@ const StandardRow = ({
   const isPlaylist = tableVariant === 'playlists';
   const isCollection = tableVariant === 'collections';
 
+  const optionCircularArtistImages = useSelector(({ sessionModel }) => sessionModel.optionCircularArtistImages);
+  const isCircle = isArtist && optionCircularArtistImages;
+
   const artistContextEntries = useContextMenuArtists(isArtist ? { ...entry, collectionId } : null);
   const albumContextEntries = useContextMenuAlbums(isAlbum ? { ...entry, collectionId } : null, {
     showArtist: variant !== 'artistAlbums',
@@ -1015,7 +1018,7 @@ const StandardRow = ({
                   );
                 } else {
                   return (
-                    <div key={rowKey + '-' + index} className={style.thumb}>
+                    <div key={rowKey + '-' + index} className={clsx(style.thumb, { [style.thumbCircle]: isCircle })}>
                       <ArtworkImage src={entry.thumbSm} alt={entry.title} loading="lazy" />
                     </div>
                   );

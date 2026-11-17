@@ -21,6 +21,7 @@ const TitleHeading = ({
   detail,
   thumb,
   thumbExpand,
+  circleThumb = false,
   icon,
   showPlay,
   showQueue,
@@ -55,7 +56,7 @@ const TitleHeading = ({
         {thumb && (
           <button
             type="button"
-            className={style.thumb}
+            className={clsx(style.thumb, { [style.thumbCircle]: circleThumb })}
             aria-label="View larger artwork"
             onClick={() => {
               dispatch.dialogModel.showModal({
@@ -91,7 +92,7 @@ const TitleHeading = ({
           </div>
         )}
 
-        {!icon && thumb === null && <div className={style.thumb}></div>}
+        {!icon && thumb === null && <div className={clsx(style.thumb, { [style.thumbCircle]: circleThumb })}></div>}
 
         <div className={style.content}>
           {title && <h1 className={clsx(style.title, style[titleSize])}>{title}</h1>}
