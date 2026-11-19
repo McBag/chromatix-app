@@ -230,6 +230,8 @@ const effects = (dispatch) => ({
       onCanPlay,
       onEnded,
       onError: dispatch.playerModel.playerError,
+      onInterruptionStart: () => dispatch.playerModel.playerInterruption(true),
+      onInterruptionEnd: () => dispatch.playerModel.playerInterruption(false),
     });
     playerX.setTrackEndedCallback(() => dispatch.playerModel.playerAutoNext());
     dispatch.playerModel.setPlayerState({
@@ -289,6 +291,16 @@ const effects = (dispatch) => ({
       dispatch.playerModel.setPlayerState({
         playerLoading: payload,
       });
+    }
+  },
+
+  // Another audio source (call, navigation, other media) took or gave back focus.
+  // Reflect it once in the UI instead of flipping with every system pause/play.
+  playerInterruption(payload, rootState) {
+    if (rootState.sessionModel._manualPause || !rootState.playerModel.playerTrackLoaded) return;
+    const playing = !payload;
+    if (rootState.playerModel.playerPlaying !== playing) {
+      dispatch.playerModel.setPlayerState({ playerPlaying: playing });
     }
   },
 

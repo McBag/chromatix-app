@@ -40,6 +40,20 @@ const hiddenLoopGuardRemainingMs = 4000;
 const nearEndPollRemainingMs = 5000;
 const minPlayedBeforeEndMs = 1500;
 const positionDriftSec = 0.4;
+// Audio-focus interruption (phone call, navigation prompt, another media source).
+// Chromium pauses the element when another source takes focus. Forcing play()
+// again only gets it paused again, so the page and the car's media UI flip
+// between playing and paused in a loop. After a few external pauses in a short
+// window we yield instead: stay paused, report "paused" to the system, and come
+// back when the browser resumes us, a play command arrives, or a probe finds
+// the focus free again.
+const interruptPauseWindowMs = 10000;
+const interruptPauseThreshold = 3;
+// Pauses right after the tab hides are the Tesla minimize auto-pause, which the
+// re-assert burst is there to undo — never count those as an interruption.
+const interruptHideGraceMs = 5000;
+const interruptConfirmPlayingMs = 1500;
+const interruptProbeDelaysMs = [10000, 30000, 60000, 120000];
 
 let playerContainer: HTMLDivElement | null = null;
 let trackEndPollId: number | null = null;
@@ -71,6 +85,18 @@ let trackEndPollMsCurrent = trackEndPollMs;
 let onLoadStartCb: () => void = () => undefined;
 let onCanPlayCb: () => void = () => undefined;
 let onErrorCb: (params: { event: Event; playerElement: HTMLAudioElement }) => void = () => undefined;
+let onInterruptionStartCb: () => void = () => undefined;
+let onInterruptionEndCb: () => void = () => undefined;
+
+let interrupted = false;
+let externalPauseTimes: number[] = [];
+let interruptProbeId: number | null = null;
+let interruptProbeIndex = 0;
+let interruptConfirmId: number | null = null;
+let selfPausePending = false;
+let pauseReassertGeneration = 0;
+let lastHiddenAtMs = 0;
+let visibilityBound = false;
 
 // Dual keep-alive pipeline for Tesla minimized tabs:
 // 1) Near-silent Web Audio oscillator (claims the audio graph)
@@ -93,6 +119,8 @@ interface PlayerInitParams {
   onCanPlay: () => void;
   onEnded: () => void;
   onError: (params: { event: Event; playerElement: HTMLAudioElement }) => void;
+  onInterruptionStart?: () => void;
+  onInterruptionEnd?: () => void;
 }
 
 // ======================================================================
@@ -108,11 +136,21 @@ export const init = ({
   onCanPlay,
   onEnded: _onEnded,
   onError,
+  onInterruptionStart,
+  onInterruptionEnd,
 }: PlayerInitParams): void => {
   console.log('%c--- player - init ---', 'color:#a18507');
   onLoadStartCb = onLoadStart;
   onCanPlayCb = onCanPlay;
   onErrorCb = onError;
+  onInterruptionStartCb = onInterruptionStart ?? (() => undefined);
+  onInterruptionEndCb = onInterruptionEnd ?? (() => undefined);
+  if (typeof document !== 'undefined' && !visibilityBound) {
+    visibilityBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) lastHiddenAtMs = Date.now();
+    });
+  }
   if (!playerElement) {
     playerElement = document.createElement('audio');
     setupPlayerElement(playerElement, volumeLevel, volumeMuted);
@@ -189,6 +227,11 @@ const setupPlayerElement = (element: HTMLAudioElement, volumeLevel: number, volu
   });
   element.addEventListener('playing', () => {
     if (!isActivePlayer(element) || pausedByUser) return;
+    if (interrupted) {
+      // The browser (or a probe) resumed us. Only trust it once it sticks.
+      confirmInterruptionEnded(element);
+      return;
+    }
     stopHiddenLoadRecovery();
     ensureAudioKeepAlive();
     if (!trackEndPollId) {
@@ -227,12 +270,29 @@ const setupPlayerElement = (element: HTMLAudioElement, volumeLevel: number, volu
     // Tesla (and some Chromium builds) auto-pause media when the browser is
     // minimized. If the user did not pause, aggressively re-assert play over
     // a long window — Tesla often re-pauses several times after hide.
-    if (!isActivePlayer(element) || pausedByUser || !element.src || shouldTreatAsTrackEnd(element)) return;
+    if (!isActivePlayer(element)) return;
+    if (selfPausePending) {
+      selfPausePending = false;
+      return;
+    }
+    if (pausedByUser || !element.src || shouldTreatAsTrackEnd(element)) return;
+    if (interrupted) {
+      // A probe or browser resume was paused again: still interrupted. Back off.
+      clearInterruptConfirm();
+      if (interruptProbeId == null) scheduleInterruptProbe();
+      return;
+    }
+    if (noteExternalPause()) {
+      enterInterruption();
+      return;
+    }
     setMediaSessionPlaying();
     ensureAudioKeepAlive();
+    // A newer pause restarts the burst; older bursts must not pile up timers.
+    const generation = ++pauseReassertGeneration;
     pauseReassertDelaysMs.forEach((delayMs) => {
       window.setTimeout(() => {
-        if (pausedByUser) return;
+        if (pausedByUser || interrupted || generation !== pauseReassertGeneration) return;
         const el = getCurrentPlayerElement();
         if (!el?.src || shouldTreatAsTrackEnd(el)) return;
         if (el.paused || !isElementAudible(el)) {
@@ -501,7 +561,7 @@ export const setNextTrack = (trackSrc: string | null): void => {
 };
 
 export const maybeWarmStartNext = (): void => {
-  if (pausedByUser || !nextTrackSrc || !playerElement) return;
+  if (pausedByUser || interrupted || !nextTrackSrc || !playerElement) return;
   if (alreadyOnSrc(nextTrackSrc)) return;
 
   const remaining = remainingMsOf(playerElement);
@@ -602,7 +662,7 @@ const bindAudioContextStateHandler = (ctx: AudioContext): void => {
     }
   }
   keepAliveStateHandler = () => {
-    if (pausedByUser) return;
+    if (pausedByUser || interrupted) return;
     if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
       void ctx.resume().catch(() => null);
     }
@@ -688,7 +748,7 @@ const ensureSilentLoopKeepAlive = (): void => {
 const startKeepAliveHealthWatch = (): void => {
   if (keepAliveHealthId != null || typeof window === 'undefined') return;
   keepAliveHealthId = window.setInterval(() => {
-    if (pausedByUser) {
+    if (pausedByUser || interrupted) {
       stopKeepAliveHealthWatch();
       return;
     }
@@ -705,7 +765,7 @@ const stopKeepAliveHealthWatch = (): void => {
 };
 
 export const ensureAudioKeepAlive = (): void => {
-  if (pausedByUser || typeof window === 'undefined') return;
+  if (pausedByUser || interrupted || typeof window === 'undefined') return;
 
   ensureWebAudioKeepAlive();
   ensureSilentLoopKeepAlive();
@@ -911,7 +971,7 @@ export const recoverToSavedPosition = (play: boolean = true): void => {
         // applied on canplay
       }
     }
-    if (play && !pausedByUser) {
+    if (play && !pausedByUser && !interrupted) {
       playWhenReady(element, activePlayToken);
       startHiddenLoadRecovery(activePlayToken);
     }
@@ -930,7 +990,7 @@ export const recoverToSavedPosition = (play: boolean = true): void => {
     pendingSeekSec = null;
   }
 
-  if (play && !pausedByUser) {
+  if (play && !pausedByUser && !interrupted) {
     playWhenReady(element, activePlayToken);
   }
 };
@@ -980,12 +1040,12 @@ const stopHiddenLoadRecovery = (): void => {
 
 const startHiddenLoadRecovery = (playToken: number): void => {
   stopHiddenLoadRecovery();
-  if (typeof document === 'undefined' || !document.hidden || pausedByUser) return;
+  if (typeof document === 'undefined' || !document.hidden || pausedByUser || interrupted) return;
 
   hiddenLoadRecoveryToken = playToken;
 
   const tick = () => {
-    if (pausedByUser || playToken !== activePlayToken || playToken !== hiddenLoadRecoveryToken) {
+    if (pausedByUser || interrupted || playToken !== activePlayToken || playToken !== hiddenLoadRecoveryToken) {
       stopHiddenLoadRecovery();
       return;
     }
@@ -1030,7 +1090,7 @@ const startHiddenLoadRecovery = (playToken: number): void => {
 export const isHiddenLoadRecoveryActive = (): boolean => hiddenLoadRecoveryId !== null;
 
 export const ensureHiddenLoadRecovery = (): void => {
-  if (typeof document === 'undefined' || !document.hidden || pausedByUser) return;
+  if (typeof document === 'undefined' || !document.hidden || pausedByUser || interrupted) return;
 
   const element = getCurrentPlayerElement();
   if (!element?.src || isElementAudible(element)) return;
@@ -1042,6 +1102,7 @@ export const ensureHiddenLoadRecovery = (): void => {
 
 export const unload = (opts?: { preserveKeepAlive?: boolean }): void => {
   console.log('%c--- player - unload ---', 'color:#a18507');
+  clearInterruption();
   stopHiddenLoadRecovery();
   // When handing off to DASH, keep the silent Web Audio oscillator running so
   // Tesla does not drop Bluetooth/media focus during the cold-load gap.
@@ -1078,13 +1139,13 @@ export const unload = (opts?: { preserveKeepAlive?: boolean }): void => {
 };
 
 const setMediaSessionPlaying = (): void => {
-  if ('mediaSession' in navigator && !pausedByUser) {
+  if ('mediaSession' in navigator && !pausedByUser && !interrupted) {
     navigator.mediaSession.playbackState = 'playing';
   }
 };
 
 export const syncHiddenMediaSession = (positionSec?: number, durationSec?: number): void => {
-  if (!('mediaSession' in navigator) || pausedByUser) return;
+  if (!('mediaSession' in navigator) || pausedByUser || interrupted) return;
 
   navigator.mediaSession.playbackState = 'playing';
 
@@ -1113,7 +1174,7 @@ const attemptElementPlay = (
   attempt: number,
   onSuccess: () => void
 ): void => {
-  if (pausedByUser || playToken !== activePlayToken) return;
+  if (pausedByUser || interrupted || playToken !== activePlayToken) return;
 
   setMediaSessionPlaying();
   ensureAudioKeepAlive();
@@ -1126,7 +1187,7 @@ const attemptElementPlay = (
       onSuccess();
     })
     .catch(() => {
-      if (pausedByUser || playToken !== activePlayToken) return;
+      if (pausedByUser || interrupted || playToken !== activePlayToken) return;
 
       hiddenPlayFailCount += 1;
       const maxRetries = typeof document !== 'undefined' && document.hidden ? hiddenPlayMaxRetries : 1;
@@ -1270,6 +1331,7 @@ const playWhenReady = (element: HTMLAudioElement, playToken: number): void => {
 export const setManualPause = (paused: boolean): void => {
   pausedByUser = paused;
   if (!paused) return;
+  clearInterruption();
   warmStartActive = false;
   gaplessGeneration += 1;
   clearGaplessTimer();
@@ -1289,6 +1351,7 @@ export const loadTrack = (
   durationMs: number = 0
 ): void => {
   console.log('%c--- player - loadTrack ---', 'color:#a18507');
+  clearInterruption();
   gaplessGeneration += 1;
   stopHiddenLoadRecovery();
   resetTrackAdvanceLatch();
@@ -1380,6 +1443,7 @@ export const pause = (): void => {
 
 export const resume = (): void => {
   pausedByUser = false;
+  clearInterruption();
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = 'playing';
   }
@@ -1419,7 +1483,7 @@ const isZombiePlayback = (element: HTMLAudioElement): boolean => {
 };
 
 export const ensureActivePlayback = (): void => {
-  if (pausedByUser) return;
+  if (pausedByUser || interrupted) return;
 
   const element = getCurrentPlayerElement();
   if (!element?.src) return;
@@ -1450,6 +1514,7 @@ export const ensureActivePlayback = (): void => {
     const onPlaySuccess = () => startTrackEndPolling();
     // pause()+play() can unstick Tesla's decoder without discarding the buffer.
     try {
+      selfPausePending = true;
       element.pause();
     } catch {
       // ignore
@@ -1571,7 +1636,7 @@ export const runBackgroundPlaybackTick = (): void => {
     return;
   }
 
-  if (pausedByUser || !element.src) return;
+  if (pausedByUser || interrupted || !element.src) return;
 
   samplePlaybackProgress(element);
 
@@ -1617,7 +1682,7 @@ export const getPlaybackProgressMs = (): number => {
  * Aggressively re-asserts playback intent so system auto-pause does not stick.
  */
 export const handleBecameHidden = (): void => {
-  if (pausedByUser) return;
+  if (pausedByUser || interrupted) return;
 
   ensureAudioKeepAlive();
   setMediaSessionPlaying();
@@ -1645,7 +1710,7 @@ export const handleBecameHidden = (): void => {
   // again after tens of seconds when background throttling kicks in harder.
   becameHiddenBurstMs.forEach((delayMs) => {
     window.setTimeout(() => {
-      if (pausedByUser) return;
+      if (pausedByUser || interrupted) return;
       const el = getCurrentPlayerElement();
       if (!el?.src) return;
       if (shouldTreatAsTrackEnd(el)) {
@@ -1664,4 +1729,123 @@ export const handleBecameHidden = (): void => {
       ensureAudioKeepAlive();
     }, delayMs);
   });
+};
+
+// ======================================================================
+// AUDIO FOCUS INTERRUPTION
+// ======================================================================
+
+export const isInterrupted = (): boolean => interrupted;
+
+const clearInterruptProbe = (): void => {
+  if (interruptProbeId != null) {
+    window.clearTimeout(interruptProbeId);
+    interruptProbeId = null;
+  }
+};
+
+const clearInterruptConfirm = (): void => {
+  if (interruptConfirmId != null) {
+    window.clearTimeout(interruptConfirmId);
+    interruptConfirmId = null;
+  }
+};
+
+const clearInterruption = (opts?: { notify?: boolean }): void => {
+  externalPauseTimes = [];
+  clearInterruptProbe();
+  clearInterruptConfirm();
+  if (!interrupted) return;
+  interrupted = false;
+  if (opts?.notify) onInterruptionEndCb();
+};
+
+/** Records a pause nobody here asked for; true once it looks like lost audio focus. */
+const noteExternalPause = (): boolean => {
+  const now = Date.now();
+  const justHidden = typeof document !== 'undefined' && document.hidden && now - lastHiddenAtMs < interruptHideGraceMs;
+  if (justHidden) return false;
+  externalPauseTimes = externalPauseTimes.filter((t) => now - t < interruptPauseWindowMs);
+  externalPauseTimes.push(now);
+  return externalPauseTimes.length >= interruptPauseThreshold;
+};
+
+const confirmInterruptionEnded = (element: HTMLAudioElement): void => {
+  if (!interrupted || interruptConfirmId != null) return;
+  interruptConfirmId = window.setTimeout(() => {
+    interruptConfirmId = null;
+    if (!interrupted || pausedByUser || !isActivePlayer(element)) return;
+    if (element.paused) {
+      if (interruptProbeId == null) scheduleInterruptProbe();
+      return;
+    }
+    clearInterruption({ notify: true });
+    setMediaSessionPlaying();
+    ensureAudioKeepAlive();
+    if (!trackEndPollId) startTrackEndPolling();
+    scheduleGaplessTimer();
+  }, interruptConfirmPlayingMs);
+};
+
+const scheduleInterruptProbe = (): void => {
+  clearInterruptProbe();
+  if (!interrupted || pausedByUser) return;
+  const delayMs = interruptProbeDelaysMs[interruptProbeIndex];
+  // Out of probes: stay quiet until the browser resumes us or a play command arrives.
+  if (delayMs == null) return;
+  interruptProbeIndex += 1;
+  interruptProbeId = window.setTimeout(() => {
+    interruptProbeId = null;
+    if (!interrupted || pausedByUser) return;
+    const element = getCurrentPlayerElement();
+    if (!element?.src) return;
+    if (!element.paused) {
+      confirmInterruptionEnded(element);
+      return;
+    }
+    Promise.resolve(element.play())
+      .then(() => confirmInterruptionEnded(element))
+      .catch(() => {
+        if (interruptProbeId == null) scheduleInterruptProbe();
+      });
+  }, delayMs);
+};
+
+const enterInterruption = (): void => {
+  if (interrupted || pausedByUser) return;
+  console.log('%c--- player - audio focus lost, yielding ---', 'color:#a18507');
+  interrupted = true;
+  externalPauseTimes = [];
+  interruptProbeIndex = 0;
+  pauseReassertGeneration += 1;
+  stopHiddenLoadRecovery();
+  stopTrackEndPolling();
+  clearGaplessTimer();
+  stopAudioKeepAlive();
+  const element = getCurrentPlayerElement();
+  snapshotElementPosition(element);
+  if (element && !element.paused) {
+    selfPausePending = true;
+    element.pause();
+  }
+  if (standbyElement && !standbyElement.paused) {
+    standbyElement.pause();
+  }
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = 'paused';
+  }
+  onInterruptionStartCb();
+  scheduleInterruptProbe();
+};
+
+/** The system keeps asking us to pause (another source owns audio focus): yield. */
+export const markInterrupted = (): void => {
+  enterInterruption();
+};
+
+/** A pause command while interrupted: stay paused and stop probing for focus. */
+export const cancelInterruptionProbes = (): void => {
+  clearInterruptProbe();
+  clearInterruptConfirm();
+  interruptProbeIndex = interruptProbeDelaysMs.length;
 };

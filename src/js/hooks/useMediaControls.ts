@@ -15,6 +15,10 @@ interface SeekDetails {
 }
 
 const hiddenPauseGraceMs = 4000;
+// Pause requests that keep coming after the minimize window mean another source
+// wants audio focus. Refusing them forever is what made play/pause flip in a loop.
+const refusedPauseWindowMs = 15000;
+const refusedPauseThreshold = 3;
 
 /**
  * Media Session owner for play, pause, skip, and in-track seek.
@@ -30,6 +34,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
   handlersRef.current = handlers;
   const hiddenAtRef = useRef(0);
   const lastSystemPauseAtRef = useRef(0);
+  const refusedPausesRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) {
@@ -63,6 +68,11 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
+        if (playerX.isInterrupted()) {
+          // Already yielded to another source. Stay paused and stop probing.
+          playerX.cancelInterruptionProbes();
+          return;
+        }
         if (typeof document !== 'undefined' && document.hidden) {
           if (!playerX.isPlaybackExpected()) return;
           const now = Date.now();
@@ -72,6 +82,17 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
           if (settled && playerX.isActivePlaybackAudible()) {
             handlersRef.current.pause();
             return;
+          }
+          if (sinceHide >= hiddenPauseGraceMs) {
+            const recent = refusedPausesRef.current.filter((t) => now - t < refusedPauseWindowMs);
+            recent.push(now);
+            refusedPausesRef.current = recent;
+            if (recent.length >= refusedPauseThreshold) {
+              refusedPausesRef.current = [];
+              lastSystemPauseAtRef.current = now;
+              playerX.markInterrupted();
+              return;
+            }
           }
           lastSystemPauseAtRef.current = now;
           navigator.mediaSession.playbackState = 'playing';
