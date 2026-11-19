@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import platformFeatures from 'js/_config/platformFeatures';
 import { sortList } from 'js/utils';
 import * as bridge from 'js/services/bridge';
-import useSortOptions from './useSortOptions';
 
 const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
   const dispatch = useDispatch();
@@ -46,7 +45,10 @@ const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
   const colArtistTracksUserRating = useSelector(({ sessionModel }) => sessionModel.colArtistTracksUserRating);
   const colArtistTracksIsFavourite = useSelector(({ sessionModel }) => sessionModel.colArtistTracksIsFavourite);
 
-  const sortOptions = useSortOptions();
+  const optionSortNumbersFirst = useSelector(({ sessionModel }) => sessionModel.optionSortNumbersFirst);
+  const optionSortIgnoreLeadingArticles = useSelector(
+    ({ sessionModel }) => sessionModel.optionSortIgnoreLeadingArticles
+  );
 
   const allArtistAlbums = useSelector(({ appModel }) => appModel.allArtistAlbums);
   const artistAlbums = allArtistAlbums[libraryId + '-' + artistId];
@@ -114,7 +116,8 @@ const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
         entries: artistAlbums,
         options: actualSortArtistAlbums,
         direction: actualOrderArtistAlbums,
-        ...sortOptions,
+        sortNumbersFirst: optionSortNumbersFirst,
+        ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
       })
     : null;
   const sortedArtistRelated = artistRelated?.map((entry) => {
@@ -124,7 +127,8 @@ const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
             entries: entry.related,
             options: actualSortArtistAlbums,
             direction: actualOrderArtistAlbums,
-            ...sortOptions,
+            sortNumbersFirst: optionSortNumbersFirst,
+            ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
           })
         : null;
     return {
@@ -137,7 +141,8 @@ const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
         entries: artistAppearances,
         options: actualSortArtistAlbums,
         direction: actualOrderArtistAlbums,
-        ...sortOptions,
+        sortNumbersFirst: optionSortNumbersFirst,
+        ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
       })
     : null;
 
@@ -172,7 +177,8 @@ const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
       entries: sortedAllReleases,
       options: actualSortArtistAlbums,
       direction: actualOrderArtistAlbums,
-      ...sortOptions,
+      sortNumbersFirst: optionSortNumbersFirst,
+      ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
     });
   }
 
@@ -212,12 +218,20 @@ const useGetArtistDetail = ({ variant, libraryId, artistId }) => {
           entries: entriesWithOriginalIndex,
           options: actualSortArtistTracks + sortAppend,
           direction: actualOrderArtistTracks,
-          ...sortOptions,
+          sortNumbersFirst: optionSortNumbersFirst,
+          ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
         })
       : null;
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allArtistTracks, artistTracks, actualSortArtistTracks, actualOrderArtistTracks, sortOptions]);
+  }, [
+    allArtistTracks,
+    artistTracks,
+    actualSortArtistTracks,
+    actualOrderArtistTracks,
+    optionSortNumbersFirst,
+    optionSortIgnoreLeadingArticles,
+  ]);
 
   const sortedArtistTracksOrder = useMemo(() => {
     return sortedArtistTracks?.map((entry) => entry.originalIndex);

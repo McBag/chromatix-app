@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import platformFeatures from 'js/_config/platformFeatures';
 import { durationToStringLong, formatReleaseYear, sortList } from 'js/utils';
 import * as bridge from 'js/services/bridge';
-import useSortOptions from './useSortOptions';
 
 const useGetAlbumDetail = ({ libraryId, albumId }) => {
   const dispatch = useDispatch();
@@ -21,7 +20,10 @@ const useGetAlbumDetail = ({ libraryId, albumId }) => {
   const colAlbumUserRating = useSelector(({ sessionModel }) => sessionModel.colAlbumUserRating);
   const colAlbumIsFavourite = useSelector(({ sessionModel }) => sessionModel.colAlbumIsFavourite);
 
-  const sortOptions = useSortOptions();
+  const optionSortNumbersFirst = useSelector(({ sessionModel }) => sessionModel.optionSortNumbersFirst);
+  const optionSortIgnoreLeadingArticles = useSelector(
+    ({ sessionModel }) => sessionModel.optionSortIgnoreLeadingArticles
+  );
 
   // prevent sorting by a hidden field
   const allowedSort = {
@@ -76,7 +78,8 @@ const useGetAlbumDetail = ({ libraryId, albumId }) => {
         return sortList({
           entries: entriesWithOriginalIndex,
           options: actualAlbumSortString,
-          ...sortOptions,
+          sortNumbersFirst: optionSortNumbersFirst,
+          ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
         });
       }
     }
@@ -86,7 +89,7 @@ const useGetAlbumDetail = ({ libraryId, albumId }) => {
       originalIndex: index,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allAlbumTracks, albumTracks, actualAlbumSortString, sortOptions]);
+  }, [allAlbumTracks, albumTracks, actualAlbumSortString]);
 
   const albumOrder = useMemo(() => {
     return sortedAlbumTracks?.map((entry) => entry.originalIndex);

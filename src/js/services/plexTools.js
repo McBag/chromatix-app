@@ -1723,22 +1723,15 @@ export const createCollection = ({ accessToken, libraryId, serverId, serverBaseU
 // EDIT COLLECTION
 // ======================================================================
 
-export const editCollection = ({ accessToken, serverBaseUrl, collectionId, title, sortTitle }) => {
+export const editCollection = ({ accessToken, serverBaseUrl, collectionId, title }) => {
   return new Promise((resolve, reject) => {
     try {
       const endpoint = endpointConfig.collection.editCollection(serverBaseUrl, collectionId);
-      // [NOTE] a plain titleSort param is silently ignored. A set sort title is locked so Plex keeps it,
-      // and an empty one is unlocked so Plex generates its own again
-      const trimmedSortTitle = sortTitle?.trim();
       axios
         .put(endpoint, null, {
           headers: getRequestHeaders(accessToken),
           params: {
             ...(title !== undefined && { title }),
-            ...(sortTitle !== undefined && {
-              'titleSort.value': trimmedSortTitle,
-              'titleSort.locked': trimmedSortTitle ? 1 : 0,
-            }),
           },
         })
         .then(() => {

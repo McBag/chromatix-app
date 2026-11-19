@@ -13,7 +13,6 @@ type Entry = {
   lastPlayed?: string;
   releaseDate?: string;
   sortOrder?: number;
-  sortTitle?: string;
   title?: string;
   totalItems?: number;
   totalTracks?: number;
@@ -22,7 +21,6 @@ type Entry = {
 };
 
 type SortFunction = (a: Entry, b: Entry) => number;
-type SortValue = { value: string; ignoreArticles: boolean };
 type SortDirection = 'asc' | 'desc';
 
 const LEADING_ARTICLES = ['A', 'An', 'The'];
@@ -54,7 +52,6 @@ const FORCED_SORT_KEYS: { [key: string]: { key: string; direction: SortDirection
  * @param direction - Overall sort direction, reverses all levels except forced keys
  * @param sortNumbersFirst - Whether to sort numeric prefixes before alphabetic ones
  * @param ignoreLeadingArticles - Whether to ignore leading articles (A, An, The) in comparisons
- * @param useSortTitle - Whether to sort titles using each entry's sortTitle (if present) instead of its title
  * @returns New sorted array of entries
  */
 
@@ -64,14 +61,12 @@ const sortList = ({
   direction = 'asc',
   sortNumbersFirst = false,
   ignoreLeadingArticles = true,
-  useSortTitle = false,
 }: {
   entries: Entry[];
   options: string;
   direction?: SortDirection;
   sortNumbersFirst?: boolean;
   ignoreLeadingArticles?: boolean;
-  useSortTitle?: boolean;
 }): Entry[] => {
   const optionsArray = options.split('-');
 
@@ -109,7 +104,7 @@ const sortList = ({
   }
 
   // Create enhanced sort functions with the setting captured in the closure
-  const sortFunctions = getSortFunctions(sortNumbersFirst, ignoreLeadingArticles, useSortTitle);
+  const sortFunctions = getSortFunctions(sortNumbersFirst, ignoreLeadingArticles);
 
   const validPrimaryKey = sortFunctions[primarySortKey] ? primarySortKey : 'title';
   const validSecondaryKey = sortFunctions[secondarySortKey] ? secondarySortKey : 'title';
@@ -142,52 +137,29 @@ const sortList = ({
  * Creates sort functions for different field types with configurable options.
  * @param sortNumbersFirst - Whether to sort numeric prefixes before alphabetic ones
  * @param ignoreLeadingArticles - Whether to ignore leading articles in comparisons
- * @param useSortTitle - Whether to sort titles using each entry's sortTitle (if present) instead of its title
  * @returns Object containing sort functions for each field type
  */
 
-const getSortFunctions = (
-  sortNumbersFirst: boolean,
-  ignoreLeadingArticles: boolean,
-  useSortTitle: boolean = false
-): Record<string, SortFunction> => {
-  // A sort title is compared as typed, so leading articles are never ignored in it
-  const getValue = (entry: Entry, field: keyof Entry): SortValue =>
-    useSortTitle && field === 'title' && entry.sortTitle
-      ? { value: entry.sortTitle, ignoreArticles: false }
-      : { value: (entry[field] as string) ?? '', ignoreArticles: ignoreLeadingArticles };
-
+const getSortFunctions = (sortNumbersFirst: boolean, ignoreLeadingArticles: boolean): Record<string, SortFunction> => {
   // Create string field comparer
   const createStringFieldComparer = (field: keyof Entry, isArticleAware: boolean): SortFunction => {
     return (a, b) => {
-      const aValue = getValue(a, field);
-      const bValue = getValue(b, field);
+      const aValue = (a[field] as string) ?? '';
+      const bValue = (b[field] as string) ?? '';
 
       // Only apply article handling for article-aware fields
-      return compareStringsWithArticles(
-        aValue.value,
-        bValue.value,
-        isArticleAware && aValue.ignoreArticles,
-        isArticleAware && bValue.ignoreArticles,
-        sortNumbersFirst
-      );
+      return isArticleAware
+        ? compareStringsWithArticles(aValue, bValue, ignoreLeadingArticles, sortNumbersFirst)
+        : compareStringsWithArticles(aValue, bValue, false, sortNumbersFirst); // No articles but still handle number sorting
     };
   };
-
-  // Entries with the same sort title fall back to their displayed titles, compared by the same
-  // title comparer with sort titles off, so the number-order and article settings still apply
-  const displayTitleCompare = useSortTitle
-    ? getSortFunctions(sortNumbersFirst, ignoreLeadingArticles, false).title
-    : null;
-  const withTitleTieBreak = (compare: SortFunction): SortFunction =>
-    displayTitleCompare ? (a, b) => compare(a, b) || displayTitleCompare(a, b) : compare;
 
   // Base sort functions
   const baseFunctions: Record<string, SortFunction> = {
     // String fields with article awareness
     album: createStringFieldComparer('album', true),
     artist: createStringFieldComparer('artist', true),
-    title: withTitleTieBreak(createStringFieldComparer('title', true)),
+    title: createStringFieldComparer('title', true),
     genre: createStringFieldComparer('genre', true),
 
     // String fields without article awareness
@@ -226,19 +198,19 @@ const getSortFunctions = (
     // Create enhanced string comparers with number-first handling
     const createNumberFirstComparer = (field: keyof Entry): SortFunction => {
       return (a, b) => {
-        const aValue = getValue(a, field);
-        const bValue = getValue(b, field);
+        const aValue = (a[field] as string) ?? '';
+        const bValue = (b[field] as string) ?? '';
 
-        let valueA = aValue.value.toUpperCase();
-        let valueB = bValue.value.toUpperCase();
+        let valueA = aValue.toUpperCase();
+        let valueB = bValue.toUpperCase();
 
         const isArticleAware = ARTICLE_AWARE_FIELDS.includes(field as string);
-        const ignoreArticlesA = isArticleAware && aValue.ignoreArticles;
-        const ignoreArticlesB = isArticleAware && bValue.ignoreArticles;
 
         // Apply article handling if needed
-        if (ignoreArticlesA) valueA = removeLeadingArticle(valueA).toUpperCase();
-        if (ignoreArticlesB) valueB = removeLeadingArticle(valueB).toUpperCase();
+        if (ignoreLeadingArticles && isArticleAware) {
+          valueA = removeLeadingArticle(valueA).toUpperCase();
+          valueB = removeLeadingArticle(valueB).toUpperCase();
+        }
 
         // Check for leading numbers
         const isFirstCharNumberA = valueA.length > 0 && !isNaN(Number(valueA[0]));
@@ -269,8 +241,8 @@ const getSortFunctions = (
 
         // Use standard string comparison with article handling for the rest
         return isArticleAware
-          ? compareStringsWithArticles(aValue.value, bValue.value, ignoreArticlesA, ignoreArticlesB)
-          : valueA.localeCompare(valueB, undefined, { numeric: true });
+          ? compareStringsWithArticles(aValue, bValue, ignoreLeadingArticles)
+          : valueA.localeCompare(valueB);
       };
     };
 
@@ -283,7 +255,7 @@ const getSortFunctions = (
       country: createNumberFirstComparer('country'),
       genre: createNumberFirstComparer('genre'),
       kind: createNumberFirstComparer('kind'),
-      title: withTitleTieBreak(createNumberFirstComparer('title')),
+      title: createNumberFirstComparer('title'),
     };
   }
 
@@ -310,8 +282,7 @@ const removeLeadingArticle = (str: string): string => {
  * Compares two strings with optional article handling and numeric sorting preferences.
  * @param strA - First string to compare
  * @param strB - Second string to compare
- * @param ignoreArticlesA - Whether to ignore a leading article in the first string
- * @param ignoreArticlesB - Whether to ignore a leading article in the second string
+ * @param ignoreLeadingArticles - Whether to ignore leading articles in comparison
  * @param sortNumbersFirst - Whether to sort numeric prefixes before alphabetic ones
  * @returns Negative, zero, or positive number indicating sort order
  */
@@ -319,8 +290,7 @@ const removeLeadingArticle = (str: string): string => {
 const compareStringsWithArticles = (
   strA: string,
   strB: string,
-  ignoreArticlesA: boolean = true,
-  ignoreArticlesB: boolean = true,
+  ignoreLeadingArticles: boolean = true,
   sortNumbersFirst: boolean = false
 ): number => {
   let valueA = strA.toUpperCase();
@@ -330,15 +300,17 @@ const compareStringsWithArticles = (
   const originalA = valueA;
   const originalB = valueB;
 
-  if (ignoreArticlesA) valueA = removeLeadingArticle(valueA).toUpperCase();
-  if (ignoreArticlesB) valueB = removeLeadingArticle(valueB).toUpperCase();
+  if (ignoreLeadingArticles) {
+    valueA = removeLeadingArticle(valueA).toUpperCase();
+    valueB = removeLeadingArticle(valueB).toUpperCase();
 
-  // If they're equal after removing articles, prefer the one without article
-  if ((ignoreArticlesA || ignoreArticlesB) && valueA === valueB) {
-    const aHasArticle = originalA !== valueA;
-    const bHasArticle = originalB !== valueB;
-    if (aHasArticle && !bHasArticle) return 1; // b comes first
-    if (!aHasArticle && bHasArticle) return -1; // a comes first
+    // If they're equal after removing articles, prefer the one without article
+    if (valueA === valueB) {
+      const aHasArticle = originalA !== valueA;
+      const bHasArticle = originalB !== valueB;
+      if (aHasArticle && !bHasArticle) return 1; // b comes first
+      if (!aHasArticle && bHasArticle) return -1; // a comes first
+    }
   }
 
   // Check for leading numbers - do this AFTER article removal

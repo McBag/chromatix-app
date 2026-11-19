@@ -2,13 +2,11 @@
 
 // Writes an HTML report of WCAG contrast ratios for key token pairs across every dev theme and contrast level.
 // Run on its own with `npm run test:colors`, which opens the report in the browser. The report can compare against
-// any saved snapshot: `original` (the values before the colour fixes) or a dated baseline. `npm run test:colors:baseline`
-// saves the current ratios as a new baseline, never overwriting older ones; `COLORS_SAVE=original npm run test:colors`
-// overwrites the original. Saved snapshots live in tests/colors/ (committed); the report is written to test-results/colors/.
+// two saved snapshots: `original` (the values before the colour fixes) and `baseline`. `npm run test:colors:baseline`
+// saves the current ratios as the baseline; `COLORS_SAVE=original npm run test:colors` overwrites the original.
 // The report is only written when COLORS_REPORT is set (as the test:colors scripts do), so normal test runs skip it.
 // The guardrails at the end enforce minimum ratios, and run with the normal tests
 
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -25,62 +23,25 @@ import getColorTokens, { ColorContrast, ColorTokensInput, contrastLevels } from 
 
 const reportPath = path.resolve('test-results/colors/audit.html');
 
-const snapshotDir = path.resolve('tests/colors');
+const snapshotNames = ['original', 'baseline'] as const;
+type SnapshotName = (typeof snapshotNames)[number];
 
 interface Snapshot {
   savedAt: string;
-  // Short commit the ratios were saved at, and whether it had uncommitted changes
-  commit?: string;
-  dirty?: boolean;
   ratios: Record<string, number>;
 }
 
-// Snapshot IDs are their file names: `original`, or `baseline-<UTC timestamp>` so they sort by date
-const isSnapshotId = (id: string): boolean => id === 'original' || id.startsWith('baseline-');
+const snapshotPath = (name: SnapshotName): string => path.resolve(`test-results/colors/${name}.json`);
 
-// COLORS_SAVE=baseline saves a new dated baseline; COLORS_SAVE=original overwrites the original
-const saveAs = ['original', 'baseline'].find((name) => name === process.env.COLORS_SAVE);
+// COLORS_SAVE=baseline (or original) saves the current ratios under that name
+const saveAs = snapshotNames.find((name) => name === process.env.COLORS_SAVE);
 
-/** Runs a git command and returns its output, or undefined if git isn't available. */
-const git = (command: string): string | undefined => {
+const readSnapshot = (name: SnapshotName): Snapshot | null => {
   try {
-    return execSync(`git ${command}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return JSON.parse(fs.readFileSync(snapshotPath(name), 'utf8'));
   } catch {
-    return undefined;
+    return null;
   }
-};
-
-/** Reads every saved snapshot, original first then baselines newest first. */
-const readSnapshots = (): Record<string, Snapshot> => {
-  const ids = (fs.existsSync(snapshotDir) ? fs.readdirSync(snapshotDir) : [])
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => file.slice(0, -'.json'.length))
-    .filter(isSnapshotId)
-    .sort((a, b) => (a === 'original' ? -1 : b === 'original' ? 1 : b.localeCompare(a)));
-  return Object.fromEntries(
-    ids.map((id) => [id, JSON.parse(fs.readFileSync(path.join(snapshotDir, `${id}.json`), 'utf8'))])
-  );
-};
-
-/** Saves the current ratios as the original or a new dated baseline. */
-const saveSnapshot = (name: string, ratios: Record<string, number>) => {
-  const savedAt = new Date().toISOString();
-  const id = name === 'original' ? 'original' : `baseline-${savedAt.slice(0, 19).replace('T', '-').replace(/:/g, '')}`;
-  const snapshot: Snapshot = {
-    savedAt,
-    commit: git('rev-parse --short HEAD'),
-    dirty: !!git('status --porcelain'),
-    ratios,
-  };
-  fs.mkdirSync(snapshotDir, { recursive: true });
-  fs.writeFileSync(path.join(snapshotDir, `${id}.json`), JSON.stringify(snapshot, null, 2));
-};
-
-/** Labels a snapshot for the report, e.g. "Baseline 1 Nov 2026, 11:53 · 8edcadc3 (uncommitted changes)". */
-const snapshotLabel = (id: string, { savedAt, commit, dirty }: Snapshot): string => {
-  const date = new Date(savedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-  const version = commit ? ` · ${commit}${dirty ? ' (uncommitted changes)' : ''}` : '';
-  return `${id === 'original' ? 'Original' : 'Baseline'} ${date}${version}`;
 };
 
 // Ratios below this difference from a snapshot are treated as unchanged
@@ -495,7 +456,7 @@ const renderPanels = (ratios: Record<string, number>): string =>
     )
     .join('');
 
-const renderReport = (panels: string, snapshots: Record<string, Snapshot>): string => {
+const renderReport = (panels: string, snapshots: Partial<Record<SnapshotName, Snapshot>>): string => {
   const tabs = contrasts
     .map(
       (contrast, index) =>
@@ -503,31 +464,18 @@ const renderReport = (panels: string, snapshots: Record<string, Snapshot>): stri
     )
     .join('');
 
-  // Snapshots arrive original first, then baselines newest first
-  const [latest, ...earlier] = Object.keys(snapshots).filter((id) => id !== 'original');
-  const button = (id: string | undefined, label: string) =>
-    `<button type="button" data-compare="${id ?? ''}"${id ? '' : ' disabled'}>${label}</button>`;
-  const compareOptions =
-    button(snapshots.original && 'original', 'Original') +
-    button(latest, 'Latest baseline') +
-    (earlier.length
-      ? `<select data-compare-select aria-label="Earlier baselines"><option value="">Earlier baselines</option>${earlier
-          .map((id) => `<option value="${id}">${escape(snapshotLabel(id, snapshots[id]))}</option>`)
-          .join('')}</select>`
-      : '') +
-    button('nothing', 'Nothing');
+  const compareOptions = [...snapshotNames, 'nothing']
+    .map(
+      (name) =>
+        `<button type="button" data-compare="${name}"${name !== 'nothing' && !snapshots[name as SnapshotName] ? ' disabled' : ''}>${name[0].toUpperCase()}${name.slice(1)}</button>`
+    )
+    .join('');
 
-  // Compares with the latest baseline by default, falling back to the original
-  const initialCompare = latest ?? (snapshots.original ? 'original' : 'nothing');
+  // Compares with the baseline by default, falling back to the original
+  const initialCompare = snapshots.baseline ? 'baseline' : snapshots.original ? 'original' : 'nothing';
 
   // Escapes `<` so the embedded JSON can't close the script tag
-  const embedded = Object.fromEntries(
-    Object.entries(snapshots).map(([id, snapshot]) => [
-      id,
-      { label: snapshotLabel(id, snapshot), ratios: snapshot.ratios },
-    ])
-  );
-  const snapshotJson = JSON.stringify(embedded).replace(/</g, '\\u003c');
+  const snapshotJson = JSON.stringify(snapshots).replace(/</g, '\\u003c');
 
   return `<!doctype html>
 <html lang="en">
@@ -539,13 +487,11 @@ const renderReport = (panels: string, snapshots: Record<string, Snapshot>): stri
   :root {
     --page: #f7f7f8; --surface: #ffffff; --line: #e2e2e6; --ink: #1c1c22; --muted: #6b6b76;
     --good: #d9f2df; --good-ink: #14532d; --ok: #fdf0c8; --ok-ink: #713f12; --poor: #fbd5d5; --poor-ink: #7f1d1d;
-    --drop: #dc2626;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --page: #141418; --surface: #1d1d23; --line: #2e2e36; --ink: #ececf1; --muted: #9a9aa6;
       --good: #173d24; --good-ink: #bbf7d0; --ok: #43360f; --ok-ink: #fde68a; --poor: #4a1a1a; --poor-ink: #fecaca;
-      --drop: #f87171;
     }
   }
   * { box-sizing: border-box; }
@@ -563,17 +509,14 @@ const renderReport = (panels: string, snapshots: Record<string, Snapshot>): stri
   td.good { background: var(--good); color: var(--good-ink); }
   td.ok { background: var(--ok); color: var(--ok-ink); }
   td.poor { background: var(--poor); color: var(--poor-ink); font-weight: 600; }
-  .drops-only td[data-key]:not(.down) { opacity: 0.2; }
+  td.changed { outline: 2px solid var(--ink); outline-offset: -2px; }
   .delta { margin-left: 6px; font-size: 11px; font-weight: 600; }
   .delta:not(:empty) { padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; }
   .delta.good { background: var(--good); color: var(--good-ink); }
   .delta.ok { background: var(--ok); color: var(--ok-ink); }
   .delta.poor { background: var(--poor); color: var(--poor-ink); }
   .delta.none { background: var(--surface); color: var(--muted); }
-  .down .delta { border: 2px solid var(--drop); }
-  .count { margin-left: 4px; font-size: 11px; }
-  .ups { opacity: 0.7; }
-  .drops { color: var(--drop); font-weight: 600; }
+  .count { margin-left: 4px; font-size: 11px; opacity: 0.7; }
   .swatch { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 18px; margin-right: 6px; border-radius: 4px; font-weight: 600; vertical-align: middle; box-shadow: 0 0 0 1px rgba(127,127,127,0.25); }
   .mark { box-sizing: border-box; width: 10px; height: 10px; border-radius: 2px; }
   .ratio { font-variant-numeric: tabular-nums; }
@@ -583,9 +526,6 @@ const renderReport = (panels: string, snapshots: Record<string, Snapshot>): stri
   .compare button { padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
   .compare button[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--page); }
   .compare button:disabled { opacity: 0.4; cursor: default; }
-  .compare select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; }
-  .compare select.active { background: var(--ink); border-color: var(--ink); color: var(--page); }
-  .drops-toggle { display: flex; gap: 4px; align-items: center; color: var(--muted); }
   .tabs button { margin-right: 4px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
   .tabs button[aria-selected='true'] { background: var(--ink); border-color: var(--ink); color: var(--page); }
 </style>
@@ -615,7 +555,6 @@ const renderReport = (panels: string, snapshots: Record<string, Snapshot>): stri
   <div class="bar">
     <div class="tabs" role="tablist">${tabs}</div>
     <div class="compare" role="group" aria-label="Compare with">Compare with ${compareOptions}</div>
-    <label class="drops-toggle"><input type="checkbox" data-drops-only> Show drops only</label>
   </div>
   ${panels}
 </main>
@@ -639,73 +578,52 @@ const renderReport = (panels: string, snapshots: Record<string, Snapshot>): stri
     });
   });
 
-  const ratings = ['poor', 'ok', 'good'];
-  const select = document.querySelector('[data-compare-select]');
-
-  // Marks each ratio that differs from the chosen snapshot with a pill showing its previous value, plus per-tab
-  // counts. Drop pills have a red border, and a ⚠ when they lower the rating
-  const compare = (id) => {
-    const snapshot = snapshots[id];
-    // Up, down and worse counts per contrast panel, plus a total under 'all'
-    const counts = {};
-    const countFor = (key) => (counts[key] = counts[key] || { up: 0, down: 0, worse: 0 });
-    const summary = ({ up, down, worse }) =>
-      '<span class="ups">↑' + up + '</span> <span class="drops">↓' + down + (worse ? ' ⚠️' + worse : '') + '</span>';
+  // Outlines each ratio that differs from the chosen snapshot, with its previous value and per-tab counts
+  const compare = (name) => {
+    const snapshot = snapshots[name];
+    // Up and down counts per contrast panel, plus a total under 'all'
+    const counts = { all: { up: 0, down: 0 } };
+    const summary = (count) => '↑' + count.up + ' ↓' + count.down;
 
     document.querySelectorAll('td[data-key]').forEach((cell) => {
       const previous = snapshot ? snapshot.ratios[cell.dataset.key] : undefined;
       const ratio = Number(cell.dataset.ratio);
-      const panel = cell.closest('.panel').id;
       const hasChanged = previous !== undefined && Math.abs(ratio - previous) >= changeThreshold;
-      const isDown = hasChanged && ratio < previous;
-      const previousRating = hasChanged ? rate(cell.dataset.kind, previous, panel) : '';
-      const isWorse = isDown && ratings.indexOf(rate(cell.dataset.kind, ratio, panel)) < ratings.indexOf(previousRating);
-      cell.classList.toggle('down', isDown);
+      cell.classList.toggle('changed', hasChanged);
       // A pill with the previous value, coloured by its own rating. Ratios missing from the snapshot (e.g. a dev
       // theme added since) are marked new rather than unchanged
       const delta = cell.querySelector('.delta');
-      delta.className = 'delta' + (hasChanged ? ' ' + previousRating : snapshot && previous === undefined ? ' none' : '');
+      delta.className = 'delta' + (hasChanged ? ' ' + rate(cell.dataset.kind, previous, cell.closest('.panel').id) : snapshot && previous === undefined ? ' none' : '');
       delta.textContent = hasChanged
-        ? (isWorse ? '⚠️ ' : '') + (isDown ? '↓' : '↑') + ' from ' + previous.toFixed(2)
+        ? (ratio > previous ? '↑' : '↓') + ' from ' + previous.toFixed(2)
         : snapshot && previous === undefined
           ? 'new'
           : '';
       if (hasChanged) {
-        for (const key of [panel, 'all']) {
-          const count = countFor(key);
-          count[isDown ? 'down' : 'up']++;
-          if (isWorse) count.worse++;
-        }
+        const panel = cell.closest('.panel').id;
+        const direction = ratio > previous ? 'up' : 'down';
+        counts[panel] = counts[panel] || { up: 0, down: 0 };
+        counts[panel][direction]++;
+        counts.all[direction]++;
       }
     });
 
     document.querySelectorAll('[data-count]').forEach((count) => {
-      count.innerHTML = snapshot ? summary(countFor(count.dataset.count)) : '';
+      count.textContent = snapshot ? summary(counts[count.dataset.count] || { up: 0, down: 0 }) : '';
     });
     document.querySelectorAll('[data-compare]').forEach((button) => {
-      button.setAttribute('aria-pressed', button.dataset.compare === id);
+      button.setAttribute('aria-pressed', button.dataset.compare === name);
     });
-    if (select) {
-      select.value = select.querySelector('option[value="' + id + '"]') ? id : '';
-      select.classList.toggle('active', !!select.value);
-    }
-    const note = document.getElementById('compare-note');
-    note.textContent = snapshot
-      ? 'Compared with ' + snapshot.label + ': '
+    document.getElementById('compare-note').textContent = snapshot
+      ? 'Compared with the ' + name + ' saved ' + new Date(snapshot.savedAt).toLocaleString('en-GB') + ': ' +
+          summary(counts.all) + ' ratios changed, each outlined with its previous value.'
       : Object.keys(snapshots).length
         ? 'Not comparing.'
         : 'Not comparing. Save a baseline with npm run test:colors:baseline, then pick it above.';
-    if (snapshot) {
-      note.insertAdjacentHTML('beforeend', summary(countFor('all')) + ' ratios changed, each marked with its previous value. Drops are red, and ⚠️ marks a lower rating.');
-    }
   };
 
   document.querySelectorAll('[data-compare]').forEach((button) => {
     button.addEventListener('click', () => compare(button.dataset.compare));
-  });
-  select?.addEventListener('change', () => compare(select.value || '${initialCompare}'));
-  document.querySelector('[data-drops-only]').addEventListener('change', (event) => {
-    document.body.classList.toggle('drops-only', event.target.checked);
   });
   compare('${initialCompare}');
 </script>
@@ -723,10 +641,16 @@ describe('Colour contrast audit', () => {
     const ratios: Record<string, number> = {};
     const panels = renderPanels(ratios);
 
-    if (saveAs) saveSnapshot(saveAs, ratios);
-    const html = renderReport(panels, readSnapshots());
+    const snapshots: Partial<Record<SnapshotName, Snapshot>> = {};
+    for (const name of snapshotNames) {
+      const snapshot = name === saveAs ? { savedAt: new Date().toISOString(), ratios } : readSnapshot(name);
+      if (snapshot) snapshots[name] = snapshot;
+    }
 
     fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+    if (saveAs) fs.writeFileSync(snapshotPath(saveAs), JSON.stringify(snapshots[saveAs], null, 2));
+
+    const html = renderReport(panels, snapshots);
     fs.writeFileSync(reportPath, html);
 
     expect(html).toContain(devThemes[0].label);

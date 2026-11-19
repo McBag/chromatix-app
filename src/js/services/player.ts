@@ -256,17 +256,6 @@ export const setManualPause = (paused: boolean): void => {
 
 export const isManualPause = (): boolean => nativeX.isManualPause();
 
-/** True while another audio source owns focus and the player is deliberately not fighting it. */
-export const isInterrupted = (): boolean => activePlayer === 'native' && nativeX.isInterrupted();
-
-export const markInterrupted = (): void => {
-  if (activePlayer === 'native') nativeX.markInterrupted();
-};
-
-export const cancelInterruptionProbes = (): void => {
-  nativeX.cancelInterruptionProbes();
-};
-
 export const isPlaybackExpected = (): boolean => {
   if (activePlayer === 'dash') return !nativeX.isManualPause();
   return nativeX.isPlaybackExpected();

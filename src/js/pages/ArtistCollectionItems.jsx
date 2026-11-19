@@ -150,8 +150,6 @@ const Title = ({
   sortedCollectionItems,
   viewCollectionItems,
 }) => {
-  const optionCircularArtistImages = useSelector(({ sessionModel }) => sessionModel.optionCircularArtistImages);
-
   return (
     <TitleHeading
       key={libraryId + '-' + collectionId}
@@ -218,13 +216,6 @@ const Title = ({
                           },
                         ]
                       : []),
-                    { variant: 'divider' },
-                    {
-                      variant: 'checkbox',
-                      label: 'Circular artist images',
-                      attr: 'optionCircularArtistImages',
-                      checked: optionCircularArtistImages,
-                    },
                   ]}
                 />
               </>
@@ -288,13 +279,6 @@ const Title = ({
                         },
                       ]
                     : []),
-                  { variant: 'divider' },
-                  {
-                    variant: 'checkbox',
-                    label: 'Circular artist images',
-                    attr: 'optionCircularArtistImages',
-                    checked: optionCircularArtistImages,
-                  },
                 ]}
               />
             )}

@@ -13,6 +13,7 @@
 node_modules/
 
 # Playwright
+test-report/
 test-results/
 tests/.auth/
 

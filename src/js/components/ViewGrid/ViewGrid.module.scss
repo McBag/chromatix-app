@@ -114,11 +114,6 @@
   }
 }
 
-// Holds the thumb and the play button, so the button isn't clipped by the thumb's overflow
-.thumbWrap {
-  position: relative;
-}
-
 .thumb {
   position: relative;
   overflow: hidden;
@@ -144,11 +139,6 @@
 
   &:after {
     @include mixins.artwork-border(6px);
-  }
-
-  &.thumbCircle,
-  &.thumbCircle:after {
-    border-radius: 50%;
   }
 
   img {

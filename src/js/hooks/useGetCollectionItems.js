@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import platformFeatures from 'js/_config/platformFeatures';
 import { safeDecodeURIComponent, safeEncodeURIComponent, sortList } from 'js/utils';
 import * as bridge from 'js/services/bridge';
-import useSortOptions from './useSortOptions';
 
 const useGetCollectionItems = ({
   libraryId,
@@ -50,7 +49,10 @@ const useGetCollectionItems = ({
   const colUserRating = useSelector(({ sessionModel }) => sessionModel[`${colPrefix}UserRating`]);
   const colIsFavourite = useSelector(({ sessionModel }) => sessionModel[`${colPrefix}IsFavourite`]);
 
-  const sortOptions = useSortOptions();
+  const optionSortNumbersFirst = useSelector(({ sessionModel }) => sessionModel.optionSortNumbersFirst);
+  const optionSortIgnoreLeadingArticles = useSelector(
+    ({ sessionModel }) => sessionModel.optionSortIgnoreLeadingArticles
+  );
 
   // prevent sorting by a hidden field
   const allowedSort =
@@ -106,7 +108,8 @@ const useGetCollectionItems = ({
         entries: collectionInfoItems,
         options: actualSortCollectionItems,
         direction: actualOrderCollectionItems,
-        ...sortOptions,
+        sortNumbersFirst: optionSortNumbersFirst,
+        ignoreLeadingArticles: optionSortIgnoreLeadingArticles,
       })
     : null;
 
