@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
+import { dlog } from 'js/debug/audioDebug';
 import * as playerX from 'js/services/player';
 
 interface MediaControlHandlers {
@@ -15,6 +16,10 @@ interface SeekDetails {
 }
 
 const hiddenPauseGraceMs = 4000;
+// After an interruption by another source, the Tesla answers every new start of
+// our audio with a media-session pause within ~30 ms, although it never pauses
+// the element itself. A pause that close to an explicit play is not the user.
+const playIntentPauseGuardMs = 2000;
 
 /**
  * Media Session owner for play, pause, skip, and in-track seek.
@@ -63,6 +68,12 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
+        const sincePlay = playerX.msSincePlayIntent();
+        if (sincePlay < playIntentPauseGuardMs) {
+          dlog(`MS pause IGNORED (${sincePlay} ms after play)`);
+          navigator.mediaSession.playbackState = 'playing';
+          return;
+        }
         if (typeof document !== 'undefined' && document.hidden) {
           if (!playerX.isPlaybackExpected()) return;
           const now = Date.now();

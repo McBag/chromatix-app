@@ -393,3 +393,5 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - [ ] Artist list: AlphabetNav scrolls to letter (grid + list)
 - [ ] MediaSession title uses real umlauts (no ae/oe rewrite)
 - [ ] Deploy tree matches existing Tesla host layout in FileZilla
+- [ ] Interrupted by another source (radio/phone) → resume: keeps playing, no Play/Pause flicker (`playIntentPauseGuardMs` in `useMediaControls.ts`, `msSincePlayIntent()` in `player.ts`)
+- [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`)

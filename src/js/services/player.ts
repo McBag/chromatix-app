@@ -28,6 +28,11 @@ type ActivePlayer = 'native' | 'dash';
 
 let activePlayer: ActivePlayer = 'native';
 let onlineRecoveryBound = false;
+// When playback was last started on purpose (play button, media key, track load).
+let lastPlayIntentAt = 0;
+
+/** Milliseconds since playback was last started on purpose. */
+export const msSincePlayIntent = (): number => (lastPlayIntentAt ? Date.now() - lastPlayIntentAt : Infinity);
 
 // ======================================================================
 // INITIALISE / UNLOAD
@@ -96,6 +101,7 @@ export const unload = (): void => {
  * replicate the routing logic.
  */
 export const loadTrack = (track: PlayerTrack, progress: number = 0, play: boolean = true): boolean => {
+  if (play) lastPlayIntentAt = Date.now();
   if (play) nativeX.clearManualPauseFlag();
   else nativeX.setManualPause(true);
 
@@ -168,6 +174,7 @@ export const pause = (): void => {
 };
 
 export const resume = (): void => {
+  lastPlayIntentAt = Date.now();
   if (activePlayer === 'dash') {
     dashX.resume();
   } else {

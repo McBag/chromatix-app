@@ -2,6 +2,8 @@
 // IMPORTS
 // ======================================================================
 
+// Opt-in debug overlay (?debug=1): must load first so audio elements and API calls can be instrumented.
+import { registerActiveElementGetter, watchStore } from 'js/debug/audioDebug';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
@@ -10,6 +12,7 @@ import { Analytics } from '@vercel/analytics/react';
 import App from 'js/app/App';
 import getEnvironment from 'js/utils/getEnvironment';
 import store from 'js/store/store';
+import * as playerX from 'js/services/player';
 
 import './css/styles.scss';
 
@@ -18,6 +21,12 @@ import './css/styles.scss';
 // ======================================================================
 
 const envData = getEnvironment();
+
+watchStore(store);
+registerActiveElementGetter(playerX.getCurrentPlayerElement);
+
+// Only when served from /debug/ (separate debug deploy); normal builds route from /.
+const routerBasename = window.location.pathname.startsWith('/debug') ? '/debug' : undefined;
 
 console.log(
   '%c*************** INIT - ' +
@@ -46,7 +55,7 @@ const root = createRoot(container);
 
 root.render(
   <Provider store={store}>
-    <BrowserRouter>
+    <BrowserRouter basename={routerBasename}>
       <App />
       <Analytics
         debug={false}

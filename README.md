@@ -2,7 +2,7 @@
 
 Tesla-optimized fork of [Chromatix](https://github.com/chromatix-app/chromatix-app), a web music player for Plex and Jellyfin.
 
-This tree is based on Chromatix **0.73.0**. Tesla-oriented behaviour is the default everywhere: there is no user-agent sniffing and no `html[data-is-tesla]` flag at runtime.
+This tree is based on Chromatix **0.74.0**. Tesla-oriented behaviour is the default everywhere: there is no user-agent sniffing and no `html[data-is-tesla]` flag at runtime.
 
 Official Chromatix: [chromatix.app](https://chromatix.app/)
 
@@ -15,6 +15,8 @@ Built for the Tesla in-car browser (split pane, background tabs, MediaSession):
 - Compact ControlBar and touch-sized album cards for the split-browser layout
 - Adjacent-album autoplay, AlphabetNav, Recently Added, and Random Albums
 - CRA-compatible `build/` output for Tesla static hosting (`npm run build:win`)
+- Ignores the spurious MediaSession pause the car sends right after playback resumes from another source
+- Opt-in on-screen audio debug log: open the app with `?debug=1` (remembered), turn off with `?debug=0` or the `×` button
 
 Details and file checklist: [`TESLA_CUSTOMIZATIONS_REAPPLY.md`](TESLA_CUSTOMIZATIONS_REAPPLY.md)  
 Merging a new upstream tag: [`UPSTREAM_SYNC.md`](UPSTREAM_SYNC.md)

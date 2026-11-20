@@ -20,7 +20,7 @@ import style from './ControlBar.module.scss';
 
 const ControlBar = () => {
   return (
-    <div className={style.wrap} data-allow-key-controls>
+    <div className={style.wrap} data-allow-key-controls data-debug-controlbar>
       <div className={style.leftSection}>
         <PrimaryControls />
       </div>
