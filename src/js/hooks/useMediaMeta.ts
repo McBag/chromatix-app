@@ -17,7 +17,7 @@ interface MediaMetadataInit {
 
 /**
  * Sets Media Session metadata for lock screens / car UIs.
- * Title is formatted as "Artist - Title" for Tesla line 1; artwork is preserved.
+ * Title is the plain track title; artist and album stay in their own fields.
  */
 const useMediaMeta = (metadata: MediaMetadataInit | null): null => {
   useEffect(() => {

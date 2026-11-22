@@ -15,16 +15,13 @@ interface TrackLike {
 }
 
 /**
- * Tesla media player line 1 (`title`): "Artist - Title".
- * Line 2 is left as-is (Tesla usually shows the stream hostname).
+ * Tesla media player line 1 (`title`): the plain track title.
+ * Artist and album stay in their own MediaMetadata fields — Tesla already
+ * shows the artist on the line below the title.
  * Unicode (including German umlauts) is kept as-is.
  */
-export const formatMediaSessionTitle = (artist?: string, title?: string): string => {
-  const artistLabel = (artist || '').trim();
-  const titleLabel = (title || '').trim();
-
-  if (artistLabel && titleLabel) return `${artistLabel} - ${titleLabel}`;
-  return titleLabel || artistLabel || 'Chromatix';
+export const formatMediaSessionTitle = (title?: string): string => {
+  return (title || '').trim() || 'Chromatix';
 };
 
 const buildArtwork = (track: TrackLike): MediaArtwork[] => {
@@ -42,7 +39,7 @@ export const teslaSetMetadataFromTrack = (track: TrackLike | null | undefined): 
   if (!track || !('mediaSession' in navigator)) return;
 
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: formatMediaSessionTitle(track.artist, track.title),
+    title: formatMediaSessionTitle(track.title),
     artist: (track.artist || '').trim(),
     album: (track.album || '').trim(),
     artwork: buildArtwork(track),

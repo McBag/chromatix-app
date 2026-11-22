@@ -122,7 +122,7 @@ npx serve -s build -l 4173
 - **Playback errors:** ignore `MEDIA_ERR_ABORTED` (intentional `src` change). `MEDIA_ERR_NETWORK` / `MEDIA_ERR_DECODE` retry the **same** track at the saved position (≤5), including after pause if the user then resumes. Other errors / exhausted retries still `playerAutoNext` so a truly dead file does not freeze the queue. While `_manualPause` is set, a transient error only flags `playerTrackError` and waits for resume.
 - **Seek UI:** `RangeSlider` passes the live input value on mouse/touch up; `usePlayerProgress` keeps a ref so debounce + React state cannot seek to the previous second. `playerProgress` always persists (including while paused).
 - **`useTeslaOptimization`:** only `syncHiddenMediaSession` / nudge — **do not** recreate `MediaMetadata` on the poll (cancels cover image loads).
-- **MediaSession title format:** `"Artist - Title"` via `formatMediaSessionTitle` (real Unicode, no umlaut rewriting).
+- **MediaSession title format:** plain track title via `formatMediaSessionTitle` (real Unicode, no umlaut rewriting). Artist and album stay in their own MediaMetadata fields.
 
 ---
 
@@ -202,12 +202,12 @@ controlBarAlbum: true,
 
 ### Tesla player lines
 
-| Line | Field    | Value                                        |
-| ---- | -------- | -------------------------------------------- |
-| 1    | `title`  | `Artist - Title` (`formatMediaSessionTitle`) |
-| 2    | (car UI) | Stream hostname — not overridden             |
+| Line | Field    | Value                                     |
+| ---- | -------- | ----------------------------------------- |
+| 1    | `title`  | Track title (`formatMediaSessionTitle`)   |
+| 2    | `artist` | Artist — Tesla shows this below the title |
 
-Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is.
+Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The album remains in the `album` field even if the Tesla media card does not show it.
 
 **Known residual:** Tesla system UI may still show cover only from the second track on some firmware builds. An experimental multi-reapply/preload path was tried and **reverted** (did not help).
 
