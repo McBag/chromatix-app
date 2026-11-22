@@ -1,4 +1,4 @@
-import { formatMediaSessionTitle, teslaSetMetadataFromTrack } from './teslaArtworkFix';
+import { formatMediaSessionArtist, formatMediaSessionTitle, teslaSetMetadataFromTrack } from './teslaArtworkFix';
 
 describe('Testing "formatMediaSessionTitle" function', () => {
   test('Returns the plain track title', () => {
@@ -13,6 +13,28 @@ describe('Testing "formatMediaSessionTitle" function', () => {
     expect(formatMediaSessionTitle('')).toBe('Chromatix');
     expect(formatMediaSessionTitle(undefined)).toBe('Chromatix');
     expect(formatMediaSessionTitle('   ')).toBe('Chromatix');
+  });
+});
+
+describe('Testing "formatMediaSessionArtist" function', () => {
+  test('Returns Artist - Album when both are present', () => {
+    expect(formatMediaSessionArtist('April Art', 'Fairground')).toBe('April Art - Fairground');
+  });
+
+  test('Returns just the artist when no album is present', () => {
+    expect(formatMediaSessionArtist('April Art', '')).toBe('April Art');
+    expect(formatMediaSessionArtist('April Art', undefined)).toBe('April Art');
+    expect(formatMediaSessionArtist('April Art', '   ')).toBe('April Art');
+  });
+
+  test('Trims whitespace around artist and album', () => {
+    expect(formatMediaSessionArtist('  April Art  ', '  Fairground  ')).toBe('April Art - Fairground');
+  });
+
+  test('Returns an empty string when the artist is missing', () => {
+    expect(formatMediaSessionArtist('', 'Fairground')).toBe('');
+    expect(formatMediaSessionArtist(undefined, 'Fairground')).toBe('');
+    expect(formatMediaSessionArtist('', '')).toBe('');
   });
 });
 
@@ -55,16 +77,27 @@ describe('Testing "teslaSetMetadataFromTrack" function', () => {
     }
   });
 
-  test('Sets title to the track title only; artist and album stay in their fields', () => {
+  test('Sets title to the track title and artist to Artist - Album', () => {
     teslaSetMetadataFromTrack({
       title: 'Hungry for Life',
       artist: 'April Art',
-      album: 'Some Album',
+      album: 'Fairground',
+    });
+
+    expect(navigator.mediaSession.metadata?.title).toBe('Hungry for Life');
+    expect(navigator.mediaSession.metadata?.artist).toBe('April Art - Fairground');
+    expect(navigator.mediaSession.metadata?.album).toBe('Fairground');
+    expect(navigator.mediaSession.playbackState).toBe('playing');
+  });
+
+  test('Keeps a plain artist line when no album is present', () => {
+    teslaSetMetadataFromTrack({
+      title: 'Hungry for Life',
+      artist: 'April Art',
     });
 
     expect(navigator.mediaSession.metadata?.title).toBe('Hungry for Life');
     expect(navigator.mediaSession.metadata?.artist).toBe('April Art');
-    expect(navigator.mediaSession.metadata?.album).toBe('Some Album');
-    expect(navigator.mediaSession.playbackState).toBe('playing');
+    expect(navigator.mediaSession.metadata?.album).toBe('');
   });
 });

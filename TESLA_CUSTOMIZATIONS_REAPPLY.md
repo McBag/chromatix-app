@@ -122,7 +122,7 @@ npx serve -s build -l 4173
 - **Playback errors:** ignore `MEDIA_ERR_ABORTED` (intentional `src` change). `MEDIA_ERR_NETWORK` / `MEDIA_ERR_DECODE` retry the **same** track at the saved position (≤5), including after pause if the user then resumes. Other errors / exhausted retries still `playerAutoNext` so a truly dead file does not freeze the queue. While `_manualPause` is set, a transient error only flags `playerTrackError` and waits for resume.
 - **Seek UI:** `RangeSlider` passes the live input value on mouse/touch up; `usePlayerProgress` keeps a ref so debounce + React state cannot seek to the previous second. `playerProgress` always persists (including while paused).
 - **`useTeslaOptimization`:** only `syncHiddenMediaSession` / nudge — **do not** recreate `MediaMetadata` on the poll (cancels cover image loads).
-- **MediaSession title format:** plain track title via `formatMediaSessionTitle` (real Unicode, no umlaut rewriting). Artist and album stay in their own MediaMetadata fields.
+- **MediaSession title format:** plain track title via `formatMediaSessionTitle`. The `artist` field is `Artist - Album` via `formatMediaSessionArtist` when an album is present (real Unicode, no umlaut rewriting). The `album` field is still set separately.
 
 ---
 
@@ -196,18 +196,18 @@ controlBarAlbum: true,
 
 ### Files
 
-- `src/js/utils/teslaArtworkFix.ts` — `teslaSetMetadataFromTrack`, `formatMediaSessionTitle`
+- `src/js/utils/teslaArtworkFix.ts` — `teslaSetMetadataFromTrack`, `formatMediaSessionTitle`, `formatMediaSessionArtist`
 - `src/js/hooks/useMediaMeta.ts`
 - ControlBar builds `artwork[]` from `thumbMd` else `thumbSm`
 
 ### Tesla player lines
 
-| Line | Field    | Value                                     |
-| ---- | -------- | ----------------------------------------- |
-| 1    | `title`  | Track title (`formatMediaSessionTitle`)   |
-| 2    | `artist` | Artist — Tesla shows this below the title |
+| Line | Field    | Value                                         |
+| ---- | -------- | --------------------------------------------- |
+| 1    | `title`  | Track title (`formatMediaSessionTitle`)       |
+| 2    | `artist` | `Artist - Album` (`formatMediaSessionArtist`) |
 
-Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The album remains in the `album` field even if the Tesla media card does not show it.
+Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The `album` field remains set even though Tesla line 2 already includes the album name.
 
 **Known residual:** Tesla system UI may still show cover only from the second track on some firmware builds. An experimental multi-reapply/preload path was tried and **reverted** (did not help).
 
@@ -315,7 +315,7 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 
 | Path                                   | Purpose                                    |
 | -------------------------------------- | ------------------------------------------ |
-| `src/js/utils/teslaArtworkFix.ts`      | MediaSession title + artwork helper        |
+| `src/js/utils/teslaArtworkFix.ts`      | MediaSession title/artist + artwork helper |
 | `src/js/utils/trustedDuration.ts`      | Live vs metadata duration for track-end    |
 | `src/js/hooks/usePlaybackKeepAlive.ts` | Background multi-song keep-alive           |
 | `src/js/hooks/useTeslaOptimization.ts` | MediaSession position poll                 |

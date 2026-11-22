@@ -17,7 +17,7 @@ interface MediaMetadataInit {
 
 /**
  * Sets Media Session metadata for lock screens / car UIs.
- * Title is the plain track title; artist and album stay in their own fields.
+ * Title is the plain track title; the artist field is "Artist - Album" when an album is set.
  */
 const useMediaMeta = (metadata: MediaMetadataInit | null): null => {
   useEffect(() => {
