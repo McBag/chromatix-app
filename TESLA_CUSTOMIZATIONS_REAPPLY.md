@@ -292,6 +292,8 @@ Hooks: `useMediaControls` + `useMediaMeta`.
 | `/libraries/:libraryId/recently-added` | `RecentlyAdded.jsx` (albums by `addedAt` desc) | ClockRewind icon |
 | `/libraries/:libraryId/random-albums`  | `RandomAlbums.jsx` (shuffled grid)             | Disc icon        |
 
+These pages do not exist upstream. Pass the page title (`TitleHeading` + `ActionWrap`) as `ViewList` / `ViewGrid` children, the same way `AlbumArray` does. The stock list header is `position: sticky; top: 90px` to sit under the sticky title; if the title is rendered outside the scroller, the header overlaps rows about 90px down.
+
 Files: `src/js/_config/routes.ts`, `src/js/components/SideBar/SideBar.jsx`, `src/js/components/index.js` (exports `AlphabetNav`).
 
 ### Sidebar UX (Tesla touch)

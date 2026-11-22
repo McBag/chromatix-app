@@ -40,14 +40,14 @@ const RandomAlbums = () => {
   const isGridView = !isLoading && !isEmptyList && viewAlbums === 'grid';
   const isListView = !isLoading && !isEmptyList && viewAlbums === 'list';
 
-  return (
+  const titleBlock = (
     <>
       <TitleHeading
         title="Random Albums"
         subtitle={sortedAlbums ? `${sortedAlbums.length} albums` : <>&nbsp;</>}
         padding={!isListView && !isGridView}
       />
-      <ActionWrap padding={!isListView && !isGridView}>
+      <ActionWrap padding={true} inset={isListView || isGridView}>
         <ActionToggle
           value={viewAlbums}
           options={[
@@ -58,6 +58,12 @@ const RandomAlbums = () => {
           icon={viewAlbums === 'grid' ? 'GridIcon' : 'ListIcon'}
         />
       </ActionWrap>
+    </>
+  );
+
+  return (
+    <>
+      {(isLoading || isEmptyList) && titleBlock}
       {isLoading && <Loading forceVisible inline showOffline />}
       {isGridView && (
         <ViewGrid
@@ -65,7 +71,9 @@ const RandomAlbums = () => {
           entries={sortedAlbums}
           showFavs={gridOptions.isFavourite}
           showRatings={gridOptions.userRating}
-        />
+        >
+          {titleBlock}
+        </ViewGrid>
       )}
       {isListView && (
         <ViewList
@@ -74,7 +82,9 @@ const RandomAlbums = () => {
           sortKey={sortAlbums}
           orderKey={orderAlbums}
           colOptions={colOptions}
-        />
+        >
+          {titleBlock}
+        </ViewList>
       )}
       {isEmptyList && <Loading forceVisible inline showOffline />}
     </>

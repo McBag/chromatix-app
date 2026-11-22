@@ -24,14 +24,14 @@ const RecentlyAdded = () => {
   const isGridView = !isLoading && !isEmptyList && viewAlbums === 'grid';
   const isListView = !isLoading && !isEmptyList && viewAlbums === 'list';
 
-  return (
+  const titleBlock = (
     <>
       <TitleHeading
         title="Recently Added"
         subtitle={sortedAlbums ? `${sortedAlbums.length} albums` : <>&nbsp;</>}
         padding={!isListView && !isGridView}
       />
-      <ActionWrap padding={!isListView && !isGridView}>
+      <ActionWrap padding={true} inset={isListView || isGridView}>
         <ActionToggle
           value={viewAlbums}
           options={[
@@ -42,6 +42,12 @@ const RecentlyAdded = () => {
           icon={viewAlbums === 'grid' ? 'GridIcon' : 'ListIcon'}
         />
       </ActionWrap>
+    </>
+  );
+
+  return (
+    <>
+      {(isLoading || isEmptyList) && titleBlock}
       {isLoading && <Loading forceVisible inline showOffline />}
       {isGridView && (
         <ViewGrid
@@ -49,7 +55,9 @@ const RecentlyAdded = () => {
           entries={sortedAlbums}
           showFavs={gridOptions.isFavourite}
           showRatings={gridOptions.userRating}
-        />
+        >
+          {titleBlock}
+        </ViewGrid>
       )}
       {isListView && (
         <ViewList
@@ -58,7 +66,9 @@ const RecentlyAdded = () => {
           sortKey={sortAlbums}
           orderKey={orderAlbums}
           colOptions={colOptions}
-        />
+        >
+          {titleBlock}
+        </ViewList>
       )}
       {isEmptyList && <Loading forceVisible inline showOffline />}
     </>
