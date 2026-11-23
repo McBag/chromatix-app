@@ -1,8 +1,8 @@
-# Chromatix Tesla Customizations — Version 0.70.0 (Vite)
+# Chromatix Tesla Customizations
 
-**Base version:** Chromatix `0.70.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `0.70.0`  
-**Tesla layer rooted on:** tag `0.66.0` + customizations, then merged `0.67.0`, `0.68.0`, and `0.70.0`  
-**Last updated:** 2026-08-13 (pause/resume position + seek/reconnect recovery)  
+**Base version:** Chromatix `1.0.0` from [chromatix-app/chromatix-app](https://github.com/chromatix-app/chromatix-app) tag `1.0.0`  
+**Tesla layer rooted on:** tag `0.66.0` + customizations, then merged forward through `0.67.0`, `0.68.0`, `0.70.0`, `0.71.0`, `0.72.0`, `0.73.0`, `0.74.0`, and `1.0.0`  
+**Last updated:** 2026-11-23 (Tesla media-bar stop/resume verified in the car)  
 **Build system:** Vite 8 + Rolldown (upstream) — **not** CRA  
 **Reference tree (older port):** Chromatix Cursor (0.59.0 + Tesla)  
 **Routine upgrades:** see **`UPSTREAM_SYNC.md`** (git merge workflow)
@@ -10,6 +10,8 @@
 This document describes all Tesla customizations applied on top of stock Chromatix. Prefer git merge (`UPSTREAM_SYNC.md`) over full re-apply; use this file when conflicts need intent.
 
 **Fork philosophy:** This tree is a Tesla-optimized Chromatix build. All former Tesla-only behavior (playback keep-alive, MediaSession sync, touch sizing, card controls) is the **default everywhere** — there is **no** `navigator.userAgent` Tesla detection and **no** `html[data-is-tesla]` attribute at runtime. Native playback **preloads the next track** on a standby `<audio>` and, while the tab is hidden, starts it before the current track ends so Tesla does not freeze JS on `ended` (DASH still routed via `player.ts` when needed).
+
+A reader-facing overview of how this fork differs from upstream is in the [README](README.md).
 
 **Explicitly not applied (and reverted if tried):**
 
@@ -112,7 +114,7 @@ npx serve -s build -l 4173
 
 ### Behavior notes
 
-- **Manual pause:** `sessionModel._manualPause` set on `playerPause`; cleared on play/resume/new track list. KeepAlive does not auto-resume the **track** after user pause. With `mediaSessionPausePolicy.keepMediaSessionOnManualPause` (default on), pause does **not** call `stopAudioKeepAlive`: MediaMetadata stays, `playbackState` is `paused`, and `setPositionState` is kept. The silent keep-alive loop **keeps playing** by default (`keepSilentKeepAlivePlayingOnPause` on): turning it off made Tesla drop the media card after a stop or a Grok interruption. The car still often shows the stop square instead of Play, so a **second Media Session `pause` or `stop`** after a Tesla-bar pause resumes (`MS pause while manual-paused -> resume`). A 600 ms debounce ignores the duplicate pause from the router + native path so one tap cannot pause and immediately resume. In-app pause does **not** arm this toggle. The 2 s `playIntentPauseGuardMs` still wins first. `registerMediaSessionStopAsPause` stays off unless testing the icon. Flags live in `mediaSessionPausePolicy.ts`; with `?debug=1` the overlay has toggles, and `?msSilent=0`, `?msHold=0`, `?msStop=1` set them from the URL (storage key `chromatix_debug_ms_policy_v3`). `setManualPause` is idempotent. `playerPause` writes the **live** element position into `playingTrackProgress` (not the 30 s-throttled store value).
+- **Manual pause:** `sessionModel._manualPause` set on `playerPause`; cleared on play/resume/new track list. KeepAlive does not auto-resume the **track** after user pause. With `mediaSessionPausePolicy.keepMediaSessionOnManualPause` (default on), pause does **not** call `stopAudioKeepAlive`: MediaMetadata stays, `playbackState` is `paused`, and `setPositionState` is kept. The silent keep-alive loop **keeps playing** by default (`keepSilentKeepAlivePlayingOnPause` on): turning it off made Tesla drop the media card after a stop or a Grok interruption. The car still often shows the stop square instead of Play, so a **second Media Session `pause` or `stop`** after a Tesla-bar pause resumes (`MS pause while manual-paused -> resume`). A 600 ms debounce ignores the duplicate pause from the router + native path so one tap cannot pause and immediately resume. In-app pause does **not** arm this toggle. The 2 s `playIntentPauseGuardMs` still wins first. `registerMediaSessionStopAsPause` stays off unless testing the icon. Flags live in `mediaSessionPausePolicy.ts`; with `?debug=1` the overlay has toggles, and `?msSilent=0`, `?msHold=0`, `?msStop=1` set them from the URL (storage key `chromatix_debug_ms_policy_v3`). `setManualPause` is idempotent. `playerPause` writes the **live** element position into `playingTrackProgress` (not the 30 s-throttled store value). **Verified in the car (2026-11-23):** the first tap on the Tesla centre square pauses and keeps the card; a second tap resumes. There is no play triangle (Tesla limitation).
 - **Pause time is not played time:** `usePlaybackKeepAlive` re-seeds `trackStartRef` on resume from `getPlaybackProgressMs()`. Wall-clock auto-next used to include the pause duration, so a long pause then play near the end skipped to the next song.
 - **Saved position / seek:** native + DASH keep `lastGoodPositionSec` + `pendingSeekSec`. `resume` / `canplay` / `window.online` call `recoverToSavedPosition`. If `currentTime` jumps to 0 or a collapsed duration end, the saved point is restored (reload same `src` if the element `ended` or has an error).
 - **False `ended`:** ignore `ended` when a mid-track position is far from the trusted duration (buffer death / Tesla stream drop). Immediate `ended` at ~0 still advances so broken files do not stall the queue.
@@ -396,5 +398,5 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - [ ] MediaSession title uses real umlauts (no ae/oe rewrite)
 - [ ] Deploy tree matches existing Tesla host layout in FileZilla
 - [ ] Interrupted by another source (radio/phone) → resume: keeps playing, no Play/Pause flicker (`playIntentPauseGuardMs` in `useMediaControls.ts`, `msSincePlayIntent()` in `player.ts`)
-- [ ] Tesla media card centre button: first tap pauses (card stays, silent keep-alive keeps playing), second tap after ~600 ms resumes (`MS pause while manual-paused -> resume`). In-app pause then bar-tap does not resume. Debug: `MS pause hold … silentPlaying=1`, no `AC close()`. Overlay / `?msSilent=0` only as an experiment (card may disappear after Grok or stop).
+- [ ] Tesla media card centre button: first tap pauses (card stays, silent keep-alive keeps playing), second tap after ~600 ms resumes (`MS pause while manual-paused -> resume`). In-app pause then bar-tap does not resume. Debug: `MS pause hold … silentPlaying=1`, no `AC close()`. Overlay / `?msSilent=0` only as an experiment (card may disappear after Grok or stop). **Verified in the car on 2026-11-23** (re-check after upstream merges).
 - [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`)

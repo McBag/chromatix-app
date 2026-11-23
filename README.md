@@ -2,25 +2,60 @@
 
 Tesla-optimized fork of [Chromatix](https://github.com/chromatix-app/chromatix-app), a web music player for Plex and Jellyfin.
 
-This tree is based on Chromatix **1.0.0**. Tesla-oriented behaviour is the default everywhere: there is no user-agent sniffing and no `html[data-is-tesla]` flag at runtime.
+This tree is based on Chromatix **1.0.0** (upstream tag `1.0.0`). Tesla-oriented behaviour is the default everywhere: there is no user-agent sniffing and no `html[data-is-tesla]` flag at runtime.
 
 Official Chromatix: [chromatix.app](https://chromatix.app/)
 
-## What this fork changes
+## What's different from upstream (chromatix-app/chromatix-app)
 
-Built for the Tesla in-car browser (split pane, background tabs, MediaSession):
+This fork is maintained for the Tesla in-car browser (split pane, background tabs, Media Session). The changes below are in this tree and are not in [upstream Chromatix](https://github.com/chromatix-app/chromatix-app).
 
-- Background playback that keeps going when the tab is minimized, including auto-next
-- Pause / seek restore the same position after a stall or dropped connection
-- Compact ControlBar and touch-sized album cards for the split-browser layout
-- Adjacent-album autoplay, AlphabetNav, Recently Added, and Random Albums
-- CRA-compatible `build/` output for Tesla static hosting (`npm run build:win`)
-- Ignores the spurious MediaSession pause the car sends right after playback resumes from another source
-- A Media Session pause (Tesla centre button) keeps the session and the silent keep-alive alive. Because the car often keeps the stop square instead of showing Play, a second tap on that square (after a short debounce) resumes. In-app pause does not use this toggle. Debug overlay / `?msSilent=0` / `?msStop=1` can try the other variants.
-- MediaSession title is the track title only; the Tesla media card's second line shows Artist - Album
-- Opt-in on-screen audio debug log: open the app with `?debug=1` (remembered), turn off with `?debug=0` or the `×` button
+### Start page and in-car UI
 
-Details and file checklist: [`TESLA_CUSTOMIZATIONS_REAPPLY.md`](TESLA_CUSTOMIZATIONS_REAPPLY.md)  
+- The web app opens on the **login form** (`PageLogin`) instead of the upstream marketing page, so the first screen in the car is a login. The Electron desktop app still uses the shorter landing page with login buttons.
+- Larger back/forward **nav arrows**: a 24×24 icon inside a 52×48 touch target.
+- Compact ControlBar for the Tesla split-browser pane: **52px** play button (44px for the other transport buttons), 108px bar height, and a full-width scrubber under the controls. From 1100px wide the bar steps up (60px play button).
+- Larger sidebar **search field** (16px text, 46px minimum height).
+- Album-card **queue and play buttons** are always visible (no hover), 40px hits, with the queue button in the primary colour. The Library section stays expanded (no collapse chevron).
+- **AlphabetNav** letter jump bar on artist lists, in a reserved gutter so letters do not overlay cards.
+
+### Playback and Media Session
+
+- Background playback continues when the tab is minimized, including auto-next. Native playback preloads the next track on a standby `<audio>` element and, while the tab is hidden, starts it before the current track ends so the car cannot freeze JavaScript on `ended`.
+- A near-silent keep-alive (Web Audio oscillator plus a looping silent `<audio>` element) holds Tesla media focus.
+- Pause and seek restore the same position after a stall or a dropped connection. Keep-alive does not auto-resume a track the user paused.
+- **2 second Media Session pause guard** (`playIntentPauseGuardMs`): the car often sends a spurious `pause` within ~30 ms after playback resumes from another source; that pause is ignored.
+- **Stop / resume from the Tesla media bar is verified working** in the car: the first tap on the centre square pauses and keeps the card; a second tap resumes. There is no play triangle — that is a Tesla limitation (the silent keep-alive stays playing so the card is not dropped after a stop or a Grok call). A 600 ms debounce ignores the duplicate pause from the same tap, so one tap cannot pause and immediately resume. This toggle applies only when the pause came from the Tesla bar, not from the in-app pause button.
+- Adjacent-album autoplay (default: continue to the older album by release year) and queue-insert of that album.
+
+### Library pages and media card
+
+- **Recently Added** and **Random Albums** sidebar pages (not in upstream). Their list headers are sticky in the same way as the Albums tab (the title block is passed as `ViewList` / `ViewGrid` children).
+- Media Session **title is the track title only**; the second line is **Artist - Album** when an album is present (`teslaArtworkFix.ts`). Unicode, including umlauts, is left as-is. Artwork is taken from the track's medium or small thumb. A known residual: on some Tesla firmware the cover may appear only from the second track.
+
+### Debug overlay
+
+The opt-in overlay lives permanently on `main`. It is hidden unless enabled:
+
+- `?debug=1` — show the overlay (remembered in `localStorage`); the header includes the app version
+- `?debug=0` or the `×` button — hide it
+- `?msSilent=0` — pause the silent keep-alive during a held pause (experiment; the card may disappear after a Grok call or a stop)
+- `?msHold=0` — tear down keep-alive on pause
+- `?msStop=1` — register Media Session `stop` as a session-preserving pause (may change the car's centre icon)
+
+### Hosting and branches
+
+- `npm run build:win` produces a CRA-style `build/` tree (`index.html`, `static/{js,css,media}`, `icon/`, `images/`, `asset-manifest.json`) for Tesla static hosting. Do not deploy Vite's raw `assets/` output. `"homepage": "."` keeps asset URLs relative.
+- On the Ultra.cc nginx host, `index.html` is served with `Cache-Control: no-cache` (the car caches HTML aggressively otherwise) and `/static` assets with a long immutable cache.
+- Upstream updates are merged from tags (see [`UPSTREAM_SYNC.md`](UPSTREAM_SYNC.md)). Snapshot branches `release/<version>` keep the last three versions: `release/1.0.0` (upstream Chromatix 1.0.0, plus Tesla work through the Artist - Album media-card line), `release/0.74.0`, and `release/0.73.0`. Later Media Session pause/resume work is on `main`.
+
+### Known limits
+
+- The Tesla media bar does not show a play triangle while this fork keeps the silent keep-alive playing (required so the card stays after a stop or a Grok call). Resume is the second tap on the stop square.
+- Tesla Light Sync does not work with browser audio. That is a vehicle limit, not something this fork can enable.
+- This fork does not transliterate umlauts in Media Session text, and it does not use an aggressive artwork re-apply path (tried, did not help, reverted).
+
+Details and a file checklist: [`TESLA_CUSTOMIZATIONS_REAPPLY.md`](TESLA_CUSTOMIZATIONS_REAPPLY.md)  
 Merging a new upstream tag: [`UPSTREAM_SYNC.md`](UPSTREAM_SYNC.md)
 
 ## Getting started

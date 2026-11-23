@@ -87,6 +87,101 @@ export const PageHome = () => {
           </div>
         </section>
 
+        {/* WHAT'S DIFFERENT FROM UPSTREAM */}
+
+        <section className={style.differences} aria-label="What's different from upstream">
+          <h2 className={style.h2}>What's different from upstream</h2>
+
+          <div className="mt-25 mt-lg-30"></div>
+
+          <div className={style.differencesIntro}>
+            <p>
+              This repository is a Tesla-optimized fork of Chromatix, based on upstream 1.0.0. The changes below are in
+              this tree and are not in chromatix-app/chromatix-app. Tesla-oriented behaviour is the default; there is no
+              user-agent sniffing.
+            </p>
+          </div>
+
+          <div className={style.differencesBlock}>
+            <h3 className={style.h3}>Start page and in-car UI</h3>
+            <ul className={style.differencesList}>
+              <li>
+                The web app opens on the login form (PageLogin) instead of this marketing page, so the first screen in
+                the car is a login.
+              </li>
+              <li>
+                Larger back/forward nav arrows (a 24×24 icon inside a 52×48 touch target), a compact ControlBar with a
+                52px play button, a larger sidebar search field, always-visible album-card queue and play buttons, an
+                always-expanded Library section, and AlphabetNav on artist lists.
+              </li>
+            </ul>
+          </div>
+
+          <div className={style.differencesBlock}>
+            <h3 className={style.h3}>Playback and Media Session</h3>
+            <ul className={style.differencesList}>
+              <li>
+                Background playback continues when the tab is minimized, including auto-next, with a silent keep-alive
+                so Tesla keeps media focus. Pause and seek restore the same position after a stall or a dropped
+                connection. A 2 second Media Session pause guard ignores the spurious pause the car sends right after
+                playback resumes.
+              </li>
+              <li>
+                Stop / resume from the Tesla media bar is verified working: the first tap on the centre square pauses
+                and keeps the card; a second tap resumes. There is no play triangle — that is a Tesla limitation. A 600
+                ms debounce means one tap cannot pause and immediately resume. This toggle applies only when the pause
+                came from the Tesla bar, not from the in-app pause button.
+              </li>
+            </ul>
+          </div>
+
+          <div className={style.differencesBlock}>
+            <h3 className={style.h3}>Library pages and media card</h3>
+            <ul className={style.differencesList}>
+              <li>
+                Recently Added and Random Albums sidebar pages, with list headers that stay sticky the same way as the
+                Albums tab.
+              </li>
+              <li>
+                Media Session title is the track title only; the second line is Artist - Album when an album is present.
+                Unicode is left as-is.
+              </li>
+            </ul>
+          </div>
+
+          <div className={style.differencesBlock}>
+            <h3 className={style.h3}>Debug, hosting, and branches</h3>
+            <ul className={style.differencesList}>
+              <li>
+                Opt-in debug overlay, permanently in this fork: <code>?debug=1</code> shows it (remembered; the header
+                includes the app version), <code>?debug=0</code> or the × button hides it. <code>?msSilent=0</code>,{' '}
+                <code>?msHold=0</code>, and <code>?msStop=1</code> try the other Media Session pause variants.
+              </li>
+              <li>
+                <code>npm run build:win</code> produces a CRA-style <code>build/</code> tree for Tesla static hosting.
+                On the Ultra.cc nginx host, <code>index.html</code> is served with Cache-Control no-cache, and{' '}
+                <code>/static</code> assets with a long immutable cache. Snapshot branches{' '}
+                <code>{'release/<version>'}</code> keep the last three versions (currently 1.0.0, 0.74.0, and 0.73.0),
+                based on the matching upstream tags.
+              </li>
+            </ul>
+          </div>
+
+          <div className={style.differencesBlock}>
+            <h3 className={style.h3}>Known limits</h3>
+            <ul className={style.differencesList}>
+              <li>
+                The Tesla media bar does not show a play triangle while the silent keep-alive stays playing (needed so
+                the card is not dropped after a stop or a Grok call). Resume is the second tap on the stop square.
+              </li>
+              <li>
+                Tesla Light Sync does not work with browser audio. That is a vehicle limit, not something this fork can
+                enable.
+              </li>
+            </ul>
+          </div>
+        </section>
+
         {/* GET STARTED */}
 
         <section className={style.getStarted} ref={getStartedRef} aria-label="Get started">
