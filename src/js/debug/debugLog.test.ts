@@ -4,6 +4,7 @@ import {
   isDebugLogStarted,
   isImageDebugMessage,
   logAlbumChange,
+  logMediaSessionArtwork,
   redactUrl,
   startDebugLogging,
   stopDebugLogging,
@@ -30,9 +31,10 @@ describe('debugLog', () => {
     expect(redactUrl(url)).toContain('width=680');
   });
 
-  test('isImageDebugMessage matches cover and album lines only', () => {
+  test('isImageDebugMessage matches cover, album, and Media Session artwork lines only', () => {
     expect(isImageDebugMessage('IMG error kind=cover url=https://example/x.jpg')).toBe(true);
     expect(isImageDebugMessage('ALBUM change source=route from=- to=1:"News"')).toBe(true);
+    expect(isImageDebugMessage('MS artwork action=set title="Limbs" count=1 src=https://example/x.jpg')).toBe(true);
     expect(isImageDebugMessage('MS pause accepted -> playerPause (hold session)')).toBe(false);
     expect(isImageDebugMessage('CALL play')).toBe(false);
   });
@@ -63,5 +65,43 @@ describe('debugLog', () => {
     expect(init.body).toContain('IMG load');
     expect(init.body).not.toContain('sekrit');
     expect(init.body).toContain('REDACTED');
+  });
+
+  test('logMediaSessionArtwork redacts tokens and no-ops when stopped', async () => {
+    logMediaSessionArtwork('set', {
+      title: 'Limbs',
+      artwork: [
+        {
+          src: 'https://example/photo/:/transcode?width=680&X-Plex-Token=sekrit',
+          sizes: '512x512',
+          type: 'image/jpeg',
+        },
+      ],
+    });
+    await Promise.resolve();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    startDebugLogging();
+    logMediaSessionArtwork('set', {
+      title: 'Limbs',
+      artwork: [
+        {
+          src: 'https://example/photo/:/transcode?width=680&X-Plex-Token=sekrit',
+          sizes: '512x512',
+          type: 'image/jpeg',
+        },
+      ],
+    });
+    for (let i = 0; i < 12; i += 1) {
+      enqueueRemoteLog(`IMG load kind=cover url=https://example/${i}.jpg`);
+    }
+    await Promise.resolve();
+    expect(globalThis.fetch).toHaveBeenCalled();
+    const body = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
+    expect(body).toContain('MS artwork action=set');
+    expect(body).toContain('title="Limbs"');
+    expect(body).toContain('sizes=512x512');
+    expect(body).not.toContain('sekrit');
+    expect(body).toContain('REDACTED');
   });
 });

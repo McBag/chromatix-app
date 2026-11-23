@@ -209,7 +209,7 @@ controlBarAlbum: true,
 | 1    | `title`  | Track title (`formatMediaSessionTitle`)       |
 | 2    | `artist` | `Artist - Album` (`formatMediaSessionArtist`) |
 
-Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The `album` field remains set even though Tesla line 2 already includes the album name.
+Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The `album` field remains set even though Tesla line 2 already includes the album name. A second call with the same title, artist, album, and artwork URLs does not assign a new `MediaMetadata` (Tesla can cancel an in-flight cover load on album change). If a later update has no artwork, the existing cover is kept. With `?debug=1`, each update is logged as `MS artwork action=set|skip|preserve` (tokens redacted).
 
 **Known residual:** Tesla system UI may still show cover only from the second track on some firmware builds. An experimental multi-reapply/preload path was tried and **reverted** (did not help).
 

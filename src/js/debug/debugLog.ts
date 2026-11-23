@@ -20,7 +20,7 @@ export const redactUrl = (url?: string | null): string => {
   }
 };
 
-export const isImageDebugMessage = (msg: string): boolean => /^(IMG|ALBUM)\b/.test(msg);
+export const isImageDebugMessage = (msg: string): boolean => /^(IMG|ALBUM|MS artwork)\b/.test(msg);
 
 type ImageLogKind = 'cover' | 'thumb' | 'preview' | 'other';
 
@@ -140,6 +140,23 @@ export const probeFailedImageUrl = async (url: string): Promise<string> => {
   } finally {
     probing.delete(url);
   }
+};
+
+export const logMediaSessionArtwork = (
+  action: 'set' | 'skip' | 'preserve',
+  input: { title?: string; artwork?: { src?: string; sizes?: string; type?: string }[] }
+): void => {
+  if (!started) return;
+  const artwork = input.artwork || [];
+  const srcs = artwork
+    .filter((item) => item?.src)
+    .map((item) => {
+      const sizes = item.sizes ? ` sizes=${item.sizes}` : '';
+      const type = item.type ? ` type=${item.type}` : '';
+      return `src=${redactUrl(item.src)}${sizes}${type}`;
+    });
+  const title = input.title ? JSON.stringify(input.title) : '-';
+  emit(`MS artwork action=${action} title=${title} count=${srcs.length}${srcs.length ? ` ${srcs.join(' ')}` : ''}`);
 };
 
 export const logAlbumChange = (input: { source: string; from?: AlbumRef | null; to?: AlbumRef | null }): void => {

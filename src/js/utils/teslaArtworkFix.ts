@@ -1,3 +1,5 @@
+import { logMediaSessionArtwork } from 'js/debug/debugLog';
+
 interface MediaArtwork {
   src: string;
   sizes?: string;
@@ -46,15 +48,60 @@ const buildArtwork = (track: TrackLike): MediaArtwork[] => {
   return artwork;
 };
 
+const artworkSrcs = (items?: ReadonlyArray<{ src?: string }> | null): string[] =>
+  (items || []).map((item) => item?.src || '').filter(Boolean);
+
+const sameArtworkSrcs = (
+  left?: ReadonlyArray<{ src?: string }> | null,
+  right?: ReadonlyArray<{ src?: string }> | null
+): boolean => {
+  const a = artworkSrcs(left);
+  const b = artworkSrcs(right);
+  return a.length === b.length && a.every((src, index) => src === b[index]);
+};
+
+const cloneArtwork = (items?: ReadonlyArray<MediaArtwork | MediaImage> | null): MediaArtwork[] =>
+  (items || [])
+    .map((item) => {
+      if (!item?.src) return null;
+      const cloned: MediaArtwork = { src: item.src };
+      if (item.sizes) cloned.sizes = item.sizes;
+      if (item.type) cloned.type = item.type;
+      return cloned;
+    })
+    .filter((item): item is MediaArtwork => Boolean(item));
+
+const isSameMetadata = (
+  current: MediaMetadata | null | undefined,
+  next: { title: string; artist: string; album: string; artwork: MediaArtwork[] }
+): boolean => {
+  if (!current) return false;
+  return (
+    current.title === next.title &&
+    current.artist === next.artist &&
+    current.album === next.album &&
+    sameArtworkSrcs(current.artwork, next.artwork)
+  );
+};
+
 export const teslaSetMetadataFromTrack = (track: TrackLike | null | undefined): void => {
   if (!track || !('mediaSession' in navigator)) return;
 
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title: formatMediaSessionTitle(track.title),
-    artist: formatMediaSessionArtist(track.artist, track.album),
-    album: (track.album || '').trim(),
-    artwork: buildArtwork(track),
-  });
+  const title = formatMediaSessionTitle(track.title);
+  const artist = formatMediaSessionArtist(track.artist, track.album);
+  const album = (track.album || '').trim();
+  const incomingArtwork = buildArtwork(track);
+  const current = navigator.mediaSession.metadata;
+  const preservedArtwork = incomingArtwork.length === 0 && artworkSrcs(current?.artwork).length > 0;
+  const artwork = preservedArtwork ? cloneArtwork(current?.artwork) : incomingArtwork;
+  const next = { title, artist, album, artwork };
+
+  if (isSameMetadata(current, next)) {
+    logMediaSessionArtwork('skip', next);
+  } else {
+    navigator.mediaSession.metadata = new MediaMetadata(next);
+    logMediaSessionArtwork(preservedArtwork ? 'preserve' : 'set', next);
+  }
 
   // Explicitly claim 'playing' state early (before loadTrack src swap) so that
   // Tesla's media focus / Bluetooth does not drop during the cold-load gap on auto-next.

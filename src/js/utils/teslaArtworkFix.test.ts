@@ -100,4 +100,45 @@ describe('Testing "teslaSetMetadataFromTrack" function', () => {
     expect(navigator.mediaSession.metadata?.artist).toBe('April Art');
     expect(navigator.mediaSession.metadata?.album).toBe('');
   });
+
+  test('Does not replace MediaMetadata when the same artwork is set again', () => {
+    const track = {
+      title: 'They Escaped the Weight of Darkness',
+      artist: 'Agalloch',
+      album: 'Marrow of the Spirit',
+      thumbMd: 'https://example/thumb-680.jpg',
+      thumbSm: 'https://example/thumb-360.jpg',
+    };
+
+    teslaSetMetadataFromTrack(track);
+    const first = navigator.mediaSession.metadata;
+    teslaSetMetadataFromTrack({
+      ...track,
+      artwork: [{ src: track.thumbMd, sizes: '512x512', type: 'image/jpeg' }],
+    });
+
+    expect(navigator.mediaSession.metadata).toBe(first);
+    expect(navigator.mediaSession.metadata?.artwork).toHaveLength(1);
+    expect(navigator.mediaSession.metadata?.artwork[0].src).toBe(track.thumbMd);
+    expect(navigator.mediaSession.playbackState).toBe('playing');
+  });
+
+  test('Keeps existing artwork when a later update has no thumb', () => {
+    teslaSetMetadataFromTrack({
+      title: 'They Escaped the Weight of Darkness',
+      artist: 'Agalloch',
+      album: 'Marrow of the Spirit',
+      thumbMd: 'https://example/thumb-680.jpg',
+    });
+
+    teslaSetMetadataFromTrack({
+      title: 'Into the Painted Grey',
+      artist: 'Agalloch',
+      album: 'Marrow of the Spirit',
+    });
+
+    expect(navigator.mediaSession.metadata?.title).toBe('Into the Painted Grey');
+    expect(navigator.mediaSession.metadata?.artwork).toHaveLength(1);
+    expect(navigator.mediaSession.metadata?.artwork[0].src).toBe('https://example/thumb-680.jpg');
+  });
 });

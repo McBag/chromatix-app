@@ -32,7 +32,7 @@ This fork is maintained for the Tesla in-car browser (split pane, background tab
 
 - **Recently Added** and **Random Albums** sidebar pages (not in upstream). Their list headers are sticky in the same way as the Albums tab (the title block is passed as `ViewList` / `ViewGrid` children).
 - The album page reuses cached album info and artwork from `allArtistAlbums` and similar lists (IDs compared with `String()`), so the header can appear immediately with a known thumb. The large header uses the 680px `thumbMd` image, with the 360px thumb as a fallback until that loads.
-- Media Session **title is the track title only**; the second line is **Artist - Album** when an album is present (`teslaArtworkFix.ts`). Unicode, including umlauts, is left as-is. Artwork is taken from the track's medium or small thumb. A known residual: on some Tesla firmware the cover may appear only from the second track.
+- Media Session **title is the track title only**; the second line is **Artist - Album** when an album is present (`teslaArtworkFix.ts`). Unicode, including umlauts, is left as-is. Artwork is taken from the track's medium or small thumb. Identical Media Session metadata is not written again (the player and the ControlBar hook both call `teslaSetMetadataFromTrack`; a second write can cancel Tesla's in-flight cover load). A follow-up update without artwork keeps the cover already on the card. A known residual: on some Tesla firmware the cover may still appear only from the second track.
 
 ### Debug overlay
 
@@ -40,7 +40,7 @@ The opt-in overlay lives permanently on `main`. It is hidden unless enabled:
 
 - `?debug=1` — show the overlay (remembered in `localStorage`); the header includes the app version
 - `?debug=0` or the `×` button — hide it
-- The overlay **Images** button (next to LOG / Clear / Mark) shows only cover, thumbnail, and album-change lines
+- The overlay **Images** button (next to LOG / Clear / Mark) shows cover, thumbnail, album-change, and Media Session artwork lines (`MS artwork action=set|skip|preserve`)
 - While the overlay is on, the same events (including image load/failure with HTTP status, album changes, and Media Session / playback lines) are batched to `POST /__chromatix-debug-log` and appended on the Tesla host at `~/logs/chromatix-debug.log`. Nothing is sent or written when debug is off
 - `?msSilent=0` — pause the silent keep-alive during a held pause (experiment; the card may disappear after a Grok call or a stop)
 - `?msHold=0` — tear down keep-alive on pause
@@ -50,6 +50,7 @@ The opt-in overlay lives permanently on `main`. It is hidden unless enabled:
 
 - `npm run build:win` produces a CRA-style `build/` tree (`index.html`, `static/{js,css,media}`, `icon/`, `images/`, `asset-manifest.json`) for Tesla static hosting. Do not deploy Vite's raw `assets/` output. `"homepage": "."` keeps asset URLs relative.
 - On the Ultra.cc nginx host, `index.html` is served with `Cache-Control: no-cache` (the car caches HTML aggressively otherwise) and `/static` assets with a long immutable cache.
+- `@vercel/analytics` is mounted only on `*.vercel.app`. On the Ultra.cc host it is omitted so the car does not load `/_vercel/insights/script.js` (that path falls back to `index.html` and throws `Unexpected token '<'`).
 - Upstream updates are merged from tags (see [`UPSTREAM_SYNC.md`](UPSTREAM_SYNC.md)). Snapshot branches `release/<version>` keep the last three versions: `release/1.0.0` (upstream Chromatix 1.0.0, plus Tesla work through the Artist - Album media-card line), `release/0.74.0`, and `release/0.73.0`. Later Media Session pause/resume work is on `main`.
 
 ### Known limits
