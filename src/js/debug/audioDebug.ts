@@ -101,6 +101,17 @@ const persist = (): void => {
   }, 1000);
 };
 
+export const formatJsErrorEvent = (event: any): string => {
+  const message = event?.message || (typeof event === 'string' ? event : 'error');
+  const target = event?.target as { src?: string; href?: string } | null | undefined;
+  const targetUrl = target && (target.src || target.href) ? String(target.src || target.href) : '';
+  const filename = event?.filename || targetUrl || '';
+  if (!filename) return `JS ERROR ${message}`;
+  const line = event?.lineno != null ? `:${event.lineno}` : '';
+  const col = event?.colno != null ? `:${event.colno}` : '';
+  return `JS ERROR ${message} at ${filename}${line}${col}`;
+};
+
 export const dlog = (msg: string): void => {
   if (!active) return;
   const now = Date.now();
@@ -355,7 +366,7 @@ const install = (): void => {
   (window as any).visualViewport?.addEventListener('resize', () => dlog(`PAGE vv-resize ${viewport()}`));
   window.addEventListener('online', () => dlog('NET online'));
   window.addEventListener('offline', () => dlog('NET offline'));
-  window.addEventListener('error', (e: any) => dlog(`JS ERROR ${e?.message || e}`));
+  window.addEventListener('error', (e: any) => dlog(formatJsErrorEvent(e)));
   window.addEventListener('unhandledrejection', (e: any) => {
     const r = e?.reason;
     dlog(`JS REJECTION ${r?.name || ''}: ${r?.message || r}`);

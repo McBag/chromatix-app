@@ -25,6 +25,7 @@ export { default as setLocalStorage } from './setLocalStorage';
 export { default as slugifyTagName } from './slugifyTagName';
 export { default as sortList, getAlphabetLetter, findAlphabetEntryIndex } from './sortList';
 export { teslaSetMetadataFromTrack, formatMediaSessionTitle, formatMediaSessionArtist } from './teslaArtworkFix';
+export { findCachedAlbum } from './findCachedAlbum';
 export { default as resolveTrustedDurationSec, resolveTrustedDurationMs } from './trustedDuration';
 export { default as validateEntityName } from './validateEntityName';
 export { default as validateHttpsUrl } from './validateHttpsUrl';

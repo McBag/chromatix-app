@@ -261,7 +261,7 @@ Hooks: `useMediaControls` + `useMediaMeta`.
 
 ### Behavior
 
-- Album detail **Queue** → `addAlbumToQueue`
+- Album detail **Queue** → `addAlbumToQueue`. The header resolves album info from `allAlbums` plus cached artist/library lists (`findCachedAlbum`, IDs via `String()`), so a known cover is shown immediately while `getAlbumDetails` loads in the background. The large header uses `thumbMd` (680) with `thumbSm` (360) as a fallback placeholder.
 - Album cards: queue control top-right; play/pause bottom-right; controls visible **without hover**
 - Queue button background: `var(--color-primary-bg)` (0.66 token; was `primary-background` in older CRA)
 - Card buttons: **40 px**; icons **16 px**; no hover scale inflate
@@ -400,4 +400,4 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - [ ] Deploy tree matches existing Tesla host layout in FileZilla
 - [ ] Interrupted by another source (radio/phone) → resume: keeps playing, no Play/Pause flicker (`playIntentPauseGuardMs` in `useMediaControls.ts`, `msSincePlayIntent()` in `player.ts`)
 - [ ] Tesla media card centre button: first tap pauses (card stays, silent keep-alive keeps playing), second tap after ~600 ms resumes (`MS pause while manual-paused -> resume`). In-app pause then bar-tap does not resume. Debug: `MS pause hold … silentPlaying=1`, no `AC close()`. Overlay / `?msSilent=0` only as an experiment (card may disappear after Grok or stop). **Verified in the car on 2026-11-23** (re-check after upstream merges).
-- [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`). **Images** filters the list to cover/thumbnail/album lines. With debug on, events are also appended to `~/logs/chromatix-debug.log` via `POST /__chromatix-debug-log` (off otherwise).
+- [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`). **Images** filters the list to cover/thumbnail/album lines. With debug on, events are also appended to `~/logs/chromatix-debug.log` via `POST /__chromatix-debug-log` (off otherwise). JS errors include filename, line and column.

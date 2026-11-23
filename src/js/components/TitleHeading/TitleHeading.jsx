@@ -20,6 +20,7 @@ const TitleHeading = ({
   subtitle,
   detail,
   thumb,
+  thumbPlaceholder,
   thumbExpand,
   circleThumb = false,
   icon,
@@ -65,7 +66,7 @@ const TitleHeading = ({
               });
             }}
           >
-            <ArtworkImage src={thumb} alt={title} debugKind="cover" />
+            <ArtworkImage src={thumb} placeholderSrc={thumbPlaceholder} alt={title} debugKind="cover" />
           </button>
         )}
 

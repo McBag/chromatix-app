@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import platformFeatures from 'js/_config/platformFeatures';
-import { durationToStringLong, formatReleaseYear, sortList } from 'js/utils';
+import { durationToStringLong, findCachedAlbum, formatReleaseYear, sortList } from 'js/utils';
 import * as bridge from 'js/services/bridge';
 import useSortOptions from './useSortOptions';
 
@@ -36,8 +36,7 @@ const useGetAlbumDetail = ({ libraryId, albumId }) => {
   };
   const actualAlbumSortString = allowedSort[albumSortString?.split('-')[0]] ? albumSortString : null;
 
-  const allAlbums = useSelector(({ appModel }) => appModel.allAlbums);
-  const albumInfo = allAlbums?.find((album) => album.albumId === albumId);
+  const albumInfo = useSelector(({ appModel }) => findCachedAlbum(appModel, albumId));
 
   const allAlbumTracks = useSelector(({ appModel }) => appModel.allAlbumTracks);
   const albumTracks = allAlbumTracks[libraryId + '-' + albumId];

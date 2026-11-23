@@ -73,7 +73,7 @@ const AlbumDetail = () => {
   const isEmptyList = !isLoading && albumTracks?.length === 0;
   const isListView = !isLoading && !isEmptyList;
 
-  const isLoaded = playingVariant === 'albums' && playingAlbumId === albumId;
+  const isLoaded = playingVariant === 'albums' && String(playingAlbumId) === String(albumId);
   const isPlaying = isLoaded && playerPlaying;
 
   const titleBlock = (
@@ -151,8 +151,9 @@ const Title = ({
   return (
     <TitleHeading
       key={libraryId + '-' + albumId}
-      thumb={albumThumb}
-      thumbExpand={albumThumbMedium}
+      thumb={albumThumbMedium || albumThumb}
+      thumbPlaceholder={albumThumbMedium && albumThumb && albumThumbMedium !== albumThumb ? albumThumb : undefined}
+      thumbExpand={albumThumbMedium || albumThumb}
       title={albumTitle}
       subtitle={
         albumArtist && (

@@ -31,6 +31,7 @@ This fork is maintained for the Tesla in-car browser (split pane, background tab
 ### Library pages and media card
 
 - **Recently Added** and **Random Albums** sidebar pages (not in upstream). Their list headers are sticky in the same way as the Albums tab (the title block is passed as `ViewList` / `ViewGrid` children).
+- The album page reuses cached album info and artwork from `allArtistAlbums` and similar lists (IDs compared with `String()`), so the header can appear immediately with a known thumb. The large header uses the 680px `thumbMd` image, with the 360px thumb as a fallback until that loads.
 - Media Session **title is the track title only**; the second line is **Artist - Album** when an album is present (`teslaArtworkFix.ts`). Unicode, including umlauts, is left as-is. Artwork is taken from the track's medium or small thumb. A known residual: on some Tesla firmware the cover may appear only from the second track.
 
 ### Debug overlay

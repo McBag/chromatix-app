@@ -84,4 +84,30 @@ describe('audioDebug opt-in', () => {
     expect(overlay?.textContent).not.toContain('CALL play');
     vi.unstubAllGlobals();
   });
+
+  test('logs JS errors with filename, line and column', async () => {
+    const mod = await load('?debug=1');
+    expect(mod.formatJsErrorEvent({ message: "Unexpected token '<'" })).toBe("JS ERROR Unexpected token '<'");
+    expect(
+      mod.formatJsErrorEvent({
+        message: "Unexpected token '<'",
+        filename: 'https://example.test/static/js/index.abc.js',
+        lineno: 1,
+        colno: 2,
+      })
+    ).toBe("JS ERROR Unexpected token '<' at https://example.test/static/js/index.abc.js:1:2");
+    window.dispatchEvent(
+      new ErrorEvent('error', {
+        message: "Unexpected token '<'",
+        filename: 'https://example.test/static/js/index.abc.js',
+        lineno: 1,
+        colno: 2,
+      })
+    );
+    await vi.waitFor(() => {
+      expect(document.getElementById('chromatix-debug-overlay')?.textContent).toContain(
+        "JS ERROR Unexpected token '<' at https://example.test/static/js/index.abc.js:1:2"
+      );
+    });
+  });
 });
