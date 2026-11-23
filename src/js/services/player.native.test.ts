@@ -628,13 +628,13 @@ describe('Player Service', () => {
       await Promise.resolve();
     });
 
-    test('defaults hold the session, pause the silent loop, and do not register stop', () => {
+    test('defaults hold the session, keep the silent loop playing, and do not register stop', () => {
       expect(player.mediaSessionPausePolicy.keepMediaSessionOnManualPause).toBe(true);
-      expect(player.mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(false);
+      expect(player.mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(true);
       expect(player.mediaSessionPausePolicy.registerMediaSessionStopAsPause).toBe(false);
     });
 
-    test('pause keeps Media Session claimed and pauses the silent loop in place', async () => {
+    test('pause keeps Media Session claimed and the silent loop playing', async () => {
       const silent = silentEl();
       expect(silent).toBeTruthy();
       const silentSrc = silent!.src;
@@ -650,7 +650,7 @@ describe('Player Service', () => {
       expect(setPositionState).toHaveBeenCalled();
       expect(lastCtx?.state).not.toBe('closed');
       expect(silent!.src).toBe(silentSrc);
-      expect(silent!.paused).toBe(true);
+      expect(silent!.paused).toBe(false);
     });
 
     test('a second pause is ignored once the session is already held', async () => {
@@ -660,7 +660,7 @@ describe('Player Service', () => {
       player.pause();
       expect(elementA().paused).toBe(true);
       expect(silent!.src).toBe(silentSrc);
-      expect(silent!.paused).toBe(true);
+      expect(silent!.paused).toBe(false);
       expect(lastCtx?.state).not.toBe('closed');
       expect(navigator.mediaSession.playbackState).toBe('paused');
     });
@@ -668,7 +668,7 @@ describe('Player Service', () => {
     test('resume after a held pause starts the active element again', async () => {
       player.pause();
       expect(elementA().paused).toBe(true);
-      expect(silentEl()?.paused).toBe(true);
+      expect(silentEl()?.paused).toBe(false);
       player.resume();
       await Promise.resolve();
       expect(player.isManualPause()).toBe(false);
@@ -677,13 +677,13 @@ describe('Player Service', () => {
       expect(lastCtx?.state).not.toBe('closed');
     });
 
-    test('optional silent-playing hold keeps the silent loop running', async () => {
-      player.mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause = true;
+    test('optional in-place silent pause leaves src and AudioContext in place', async () => {
+      player.mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause = false;
       const silent = silentEl();
       const silentSrc = silent!.src;
       player.pause();
       expect(elementA().paused).toBe(true);
-      expect(silent!.paused).toBe(false);
+      expect(silent!.paused).toBe(true);
       expect(silent!.src).toBe(silentSrc);
       expect(lastCtx?.state).not.toBe('closed');
       expect(navigator.mediaSession.playbackState).toBe('paused');

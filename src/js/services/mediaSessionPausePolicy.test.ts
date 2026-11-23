@@ -10,15 +10,15 @@ import {
 
 describe('mediaSessionPausePolicy', () => {
   afterEach(() => {
-    localStorage.removeItem('chromatix_debug_ms_policy');
+    localStorage.removeItem('chromatix_debug_ms_policy_v3');
     Object.assign(mediaSessionPausePolicy, defaultMediaSessionPausePolicy);
   });
 
-  test('defaults hold the session and pause the silent loop', () => {
+  test('defaults hold the session and keep the silent loop playing', () => {
     applyMediaSessionPausePolicyFromSearch('');
     expect(mediaSessionPausePolicy).toEqual(defaultMediaSessionPausePolicy);
-    expect(mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(false);
-    expect(describeMediaSessionPausePolicy()).toBe('hold=1 silentPlaying=0 stopAsPause=0');
+    expect(mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(true);
+    expect(describeMediaSessionPausePolicy()).toBe('hold=1 silentPlaying=1 stopAsPause=0');
   });
 
   test('parses debug URL flags', () => {

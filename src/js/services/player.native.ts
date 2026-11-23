@@ -4,6 +4,7 @@
 
 import { dlog } from 'js/debug/audioDebug';
 import { endedAtDecodedDuration, resolveTrustedDurationSec } from 'js/utils/trustedDuration';
+import { clearMediaSessionPauseOrigin } from './mediaSessionPauseAction';
 import {
   describeMediaSessionPausePolicy,
   mediaSessionPausePolicy,
@@ -1469,6 +1470,7 @@ export const pause = (): void => {
 
 export const resume = (): void => {
   pausedByUser = false;
+  clearMediaSessionPauseOrigin();
   dlog(
     `MS/player resume ${describeMediaSessionPausePolicy()} ${keepAliveDebugState()} active=${playerElement?.paused ? 'paused' : 'playing'}`
   );
@@ -1492,6 +1494,7 @@ export const resume = (): void => {
 
 export const clearManualPauseFlag = (): void => {
   pausedByUser = false;
+  clearMediaSessionPauseOrigin();
 };
 
 export const isManualPause = (): boolean => pausedByUser;

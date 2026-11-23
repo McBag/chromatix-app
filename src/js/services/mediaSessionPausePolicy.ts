@@ -2,10 +2,10 @@ export type MediaSessionPausePolicy = {
   /** Keep MediaMetadata, playbackState='paused', and position; do not tear down keep-alive. */
   keepMediaSessionOnManualPause: boolean;
   /**
-   * Keep the silent loop playing during a held pause. Default is false: Chromium
-   * treats any playing media element as a still-playing session and will not
-   * show a Play control (Tesla keeps the stop square). When false, the silent
-   * element is paused in place (no src reset) and the AudioContext stays open.
+   * Keep the silent loop playing during a held pause (default true). Tesla
+   * drops the media card after a stop or a Grok interruption if this is off.
+   * When false, the silent element is paused in place (no src reset) and the
+   * AudioContext stays open — useful as an experiment, not as the default.
    */
   keepSilentKeepAlivePlayingOnPause: boolean;
   /**
@@ -17,7 +17,7 @@ export type MediaSessionPausePolicy = {
 
 export const defaultMediaSessionPausePolicy: MediaSessionPausePolicy = {
   keepMediaSessionOnManualPause: true,
-  keepSilentKeepAlivePlayingOnPause: false,
+  keepSilentKeepAlivePlayingOnPause: true,
   registerMediaSessionStopAsPause: false,
 };
 
@@ -25,7 +25,7 @@ export const mediaSessionPausePolicy: MediaSessionPausePolicy = {
   ...defaultMediaSessionPausePolicy,
 };
 
-const STORAGE_KEY = 'chromatix_debug_ms_policy';
+const STORAGE_KEY = 'chromatix_debug_ms_policy_v3';
 const DEBUG_FLAG_KEY = 'chromatix_debug';
 
 const searchKeyMap = {

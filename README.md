@@ -16,7 +16,7 @@ Built for the Tesla in-car browser (split pane, background tabs, MediaSession):
 - Adjacent-album autoplay, AlphabetNav, Recently Added, and Random Albums
 - CRA-compatible `build/` output for Tesla static hosting (`npm run build:win`)
 - Ignores the spurious MediaSession pause the car sends right after playback resumes from another source
-- A Media Session pause (Tesla centre button) keeps the session alive and pauses the silent keep-alive, so the card can show Play and resume. Debug overlay toggles (`?debug=1`, or `?msSilent=1` / `?msStop=1`) can try the other variants.
+- A Media Session pause (Tesla centre button) keeps the session and the silent keep-alive alive. Because the car often keeps the stop square instead of showing Play, a second tap on that square (after a short debounce) resumes. In-app pause does not use this toggle. Debug overlay / `?msSilent=0` / `?msStop=1` can try the other variants.
 - MediaSession title is the track title only; the Tesla media card's second line shows Artist - Album
 - Opt-in on-screen audio debug log: open the app with `?debug=1` (remembered), turn off with `?debug=0` or the `×` button
 

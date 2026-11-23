@@ -4,6 +4,14 @@ import { useSelector } from 'react-redux';
 import { dlog } from 'js/debug/audioDebug';
 import * as playerX from 'js/services/player';
 import {
+  clearMediaSessionPauseOrigin,
+  isMediaSessionManualPause,
+  mediaSessionPauseToggleDebounceMs,
+  msSinceLastMediaSessionPause,
+  noteMediaSessionPause,
+  resolveMediaSessionPauseAction,
+} from 'js/services/mediaSessionPauseAction';
+import {
   describeMediaSessionPausePolicy,
   mediaSessionPausePolicy,
   subscribeMediaSessionPausePolicy,
@@ -79,20 +87,31 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
         playerX.nudgeActivePlayback();
       });
 
-      navigator.mediaSession.setActionHandler('pause', () => {
+      const resumeFromMediaSession = (source: 'pause' | 'stop'): void => {
+        dlog(`MS ${source} while manual-paused -> resume`);
+        clearMediaSessionPauseOrigin();
+        playerX.clearManualPauseFlag();
+        playerX.ensureAudioKeepAlive();
+        handlersRef.current.play();
+        playerX.nudgeActivePlayback();
+      };
+
+      const handleMediaSessionPauseOrStop = (source: 'pause' | 'stop'): void => {
         const sincePlay = playerX.msSincePlayIntent();
         if (sincePlay < playIntentPauseGuardMs) {
-          dlog(`MS pause IGNORED (${sincePlay} ms after play)`);
+          dlog(`MS ${source} IGNORED (${sincePlay} ms after play)`);
           navigator.mediaSession.playbackState = 'playing';
           return;
         }
-        if (typeof document !== 'undefined' && document.hidden) {
+        if (typeof document !== 'undefined' && document.hidden && !playerX.isManualPause()) {
           if (!playerX.isPlaybackExpected()) return;
           const now = Date.now();
           const sinceHide = hiddenAtRef.current ? now - hiddenAtRef.current : hiddenPauseGraceMs;
           const sinceSystem = now - lastSystemPauseAtRef.current;
           const settled = sinceHide >= hiddenPauseGraceMs && sinceSystem >= hiddenPauseGraceMs;
           if (settled && playerX.isActivePlaybackAudible()) {
+            noteMediaSessionPause();
+            dlog(`MS ${source} accepted (hidden, settled) -> playerPause (hold session)`);
             handlersRef.current.pause();
             return;
           }
@@ -103,8 +122,36 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
           playerX.handleBecameHidden();
           return;
         }
-        dlog('MS pause accepted -> playerPause (hold session)');
+
+        const decision = resolveMediaSessionPauseAction({
+          sincePlayIntentMs: sincePlay,
+          playIntentGuardMs: playIntentPauseGuardMs,
+          isManualPause: playerX.isManualPause(),
+          isMediaSessionManualPause: isMediaSessionManualPause(),
+          msSinceLastMediaSessionPause: msSinceLastMediaSessionPause(),
+          toggleDebounceMs: mediaSessionPauseToggleDebounceMs,
+        });
+
+        if (decision === 'resume') {
+          resumeFromMediaSession(source);
+          return;
+        }
+        if (decision === 'ignore-duplicate') {
+          dlog(`MS ${source} IGNORED (duplicate within ${mediaSessionPauseToggleDebounceMs} ms)`);
+          return;
+        }
+        if (decision === 'ignore-in-app-pause') {
+          dlog(`MS ${source} IGNORED (in-app pause, not Tesla-bar toggle)`);
+          return;
+        }
+
+        noteMediaSessionPause();
+        dlog(`MS ${source} accepted -> playerPause (hold session)`);
         handlersRef.current.pause();
+      };
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        handleMediaSessionPauseOrStop('pause');
       });
 
       navigator.mediaSession.setActionHandler('seekbackward', (details: SeekDetails | null) => {
@@ -123,14 +170,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
       if (mediaSessionPausePolicy.registerMediaSessionStopAsPause) {
         dlog('MS stop handler registered (maps to pause)');
         navigator.mediaSession.setActionHandler('stop', () => {
-          const sincePlay = playerX.msSincePlayIntent();
-          if (sincePlay < playIntentPauseGuardMs) {
-            dlog(`MS stop IGNORED (${sincePlay} ms after play)`);
-            navigator.mediaSession.playbackState = 'playing';
-            return;
-          }
-          dlog('MS stop accepted -> treated as pause (session held)');
-          handlersRef.current.pause();
+          handleMediaSessionPauseOrStop('stop');
         });
       } else {
         navigator.mediaSession.setActionHandler('stop', null);

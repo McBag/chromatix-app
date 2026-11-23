@@ -11,7 +11,7 @@
 //   × button  -> disable and hide (hooks become pass-through until reload)
 //
 // Media Session pause variants (also toggle buttons on the overlay):
-//   ?msSilent=1  -> keep silent keep-alive playing during pause (default 0)
+//   ?msSilent=0  -> pause the silent keep-alive during pause (default 1, stays playing)
 //   ?msHold=0    -> tear down keep-alive on pause (default 1)
 //   ?msStop=1    -> register stop as a session-preserving pause (default 0)
 //
