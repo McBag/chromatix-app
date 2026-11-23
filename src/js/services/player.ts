@@ -263,6 +263,8 @@ export const setManualPause = (paused: boolean): void => {
 
 export const isManualPause = (): boolean => nativeX.isManualPause();
 
+export { mediaSessionPausePolicy } from './player.native';
+
 export const isPlaybackExpected = (): boolean => {
   if (activePlayer === 'dash') return !nativeX.isManualPause();
   return nativeX.isPlaybackExpected();
@@ -279,7 +281,8 @@ export const ensureActivePlayback = (): void => {
 export const ensureAudioKeepAlive = (): void => {
   // Silent oscillator always lives on native; keep it running for DASH too so
   // Tesla does not hand audio focus to another app between segments.
-  if (!nativeX.isManualPause()) nativeX.ensureAudioKeepAlive();
+  // Native decides whether a held manual pause may still refresh keep-alive.
+  nativeX.ensureAudioKeepAlive();
 };
 
 export const stopAudioKeepAlive = (): void => {
@@ -301,8 +304,9 @@ export const isHiddenLoadRecoveryActive = (): boolean => {
 
 export const syncHiddenMediaSession = (positionSec?: number, durationSec?: number): void => {
   if (activePlayer === 'dash') {
-    if (nativeX.isManualPause() || !('mediaSession' in navigator)) return;
-    navigator.mediaSession.playbackState = 'playing';
+    if (!('mediaSession' in navigator)) return;
+    if (nativeX.isManualPause() && !nativeX.mediaSessionPausePolicy.keepMediaSessionOnManualPause) return;
+    navigator.mediaSession.playbackState = nativeX.isManualPause() ? 'paused' : 'playing';
     if (typeof navigator.mediaSession.setPositionState !== 'function') return;
     const el = dashX.getCurrentPlayerElement();
     const position = positionSec ?? el?.currentTime ?? 0;

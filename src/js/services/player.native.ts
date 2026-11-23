@@ -2,6 +2,7 @@
 // OPTIONS
 // ======================================================================
 
+import { dlog } from 'js/debug/audioDebug';
 import { endedAtDecodedDuration, resolveTrustedDurationSec } from 'js/utils/trustedDuration';
 
 const trackEndPollMs = 250;
@@ -40,6 +41,29 @@ const hiddenLoopGuardRemainingMs = 4000;
 const nearEndPollRemainingMs = 5000;
 const minPlayedBeforeEndMs = 1500;
 const positionDriftSec = 0.4;
+
+/**
+ * Toggle how a manual / Media Session pause holds the Tesla media card.
+ * Mutate properties to experiment (reload Media Session handlers after
+ * changing `registerMediaSessionStopAsPause`).
+ *
+ * - `keepMediaSessionOnManualPause`: keep MediaMetadata, playbackState='paused',
+ *   and position; do not tear down the keep-alive graph.
+ * - `keepSilentKeepAlivePlayingOnPause`: keep the silent loop and Web Audio
+ *   graph running (safer for Tesla focus). Set false to pause the silent
+ *   element in place (no src reset) and leave the AudioContext open.
+ * - `registerMediaSessionStopAsPause`: map Media Session `stop` to the same
+ *   hold-session pause. Off by default — registering it may change the Tesla
+ *   centre icon.
+ */
+export const mediaSessionPausePolicy = {
+  keepMediaSessionOnManualPause: true,
+  keepSilentKeepAlivePlayingOnPause: true,
+  registerMediaSessionStopAsPause: false,
+};
+
+const shouldHoldKeepAliveWhilePaused = (): boolean =>
+  mediaSessionPausePolicy.keepMediaSessionOnManualPause && mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause;
 
 let playerContainer: HTMLDivElement | null = null;
 let trackEndPollId: number | null = null;
@@ -602,7 +626,7 @@ const bindAudioContextStateHandler = (ctx: AudioContext): void => {
     }
   }
   keepAliveStateHandler = () => {
-    if (pausedByUser) return;
+    if (pausedByUser && !shouldHoldKeepAliveWhilePaused()) return;
     if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
       void ctx.resume().catch(() => null);
     }
@@ -688,12 +712,15 @@ const ensureSilentLoopKeepAlive = (): void => {
 const startKeepAliveHealthWatch = (): void => {
   if (keepAliveHealthId != null || typeof window === 'undefined') return;
   keepAliveHealthId = window.setInterval(() => {
-    if (pausedByUser) {
+    if (pausedByUser && !shouldHoldKeepAliveWhilePaused()) {
       stopKeepAliveHealthWatch();
       return;
     }
     ensureWebAudioKeepAlive();
     ensureSilentLoopKeepAlive();
+    if (pausedByUser && mediaSessionPausePolicy.keepMediaSessionOnManualPause) {
+      syncHiddenMediaSession();
+    }
   }, keepAliveHealthMs);
 };
 
@@ -704,8 +731,35 @@ const stopKeepAliveHealthWatch = (): void => {
   }
 };
 
+const keepAliveDebugState = (): string => {
+  const ac = audioKeepAliveCtx ? `ac=${audioKeepAliveCtx.state}` : 'ac=none';
+  const silent = silentLoopElement
+    ? `silent=${silentLoopElement.paused ? 'paused' : 'playing'} src=${silentLoopElement.src ? 1 : 0}`
+    : 'silent=none';
+  return `${ac} ${silent}`;
+};
+
+const holdAudioKeepAliveForPause = (): void => {
+  if (mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause) {
+    ensureWebAudioKeepAlive();
+    ensureSilentLoopKeepAlive();
+    startKeepAliveHealthWatch();
+    dlog(`keep-alive held playing during pause ${keepAliveDebugState()}`);
+    return;
+  }
+
+  stopKeepAliveHealthWatch();
+  try {
+    silentLoopElement?.pause();
+  } catch {
+    // ignore
+  }
+  dlog(`keep-alive paused in place (no close, no src reset) ${keepAliveDebugState()}`);
+};
+
 export const ensureAudioKeepAlive = (): void => {
-  if (pausedByUser || typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return;
+  if (pausedByUser && !shouldHoldKeepAliveWhilePaused()) return;
 
   ensureWebAudioKeepAlive();
   ensureSilentLoopKeepAlive();
@@ -1083,10 +1137,14 @@ const setMediaSessionPlaying = (): void => {
   }
 };
 
-export const syncHiddenMediaSession = (positionSec?: number, durationSec?: number): void => {
-  if (!('mediaSession' in navigator) || pausedByUser) return;
+const applyMediaSessionPosition = (
+  playbackState: MediaSessionPlaybackState,
+  positionSec?: number,
+  durationSec?: number
+): void => {
+  if (!('mediaSession' in navigator)) return;
 
-  navigator.mediaSession.playbackState = 'playing';
+  navigator.mediaSession.playbackState = playbackState;
 
   if (typeof navigator.mediaSession.setPositionState !== 'function') return;
 
@@ -1105,6 +1163,16 @@ export const syncHiddenMediaSession = (positionSec?: number, durationSec?: numbe
   } catch {
     // setPositionState may reject invalid states on some Chromium builds
   }
+};
+
+export const syncHiddenMediaSession = (positionSec?: number, durationSec?: number): void => {
+  if (!('mediaSession' in navigator)) return;
+  if (pausedByUser) {
+    if (!mediaSessionPausePolicy.keepMediaSessionOnManualPause) return;
+    applyMediaSessionPosition('paused', positionSec, durationSec);
+    return;
+  }
+  applyMediaSessionPosition('playing', positionSec, durationSec);
 };
 
 const attemptElementPlay = (
@@ -1275,10 +1343,19 @@ export const setManualPause = (paused: boolean): void => {
   clearGaplessTimer();
   stopHiddenLoadRecovery();
   stopTrackEndPolling();
-  stopAudioKeepAlive();
   if (playerElement) playerElement.loop = false;
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.playbackState = 'paused';
+  if (mediaSessionPausePolicy.keepMediaSessionOnManualPause) {
+    holdAudioKeepAliveForPause();
+    syncHiddenMediaSession();
+    dlog(
+      `MS pause hold session=1 silentPlaying=${mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause ? 1 : 0} ${keepAliveDebugState()}`
+    );
+  } else {
+    stopAudioKeepAlive();
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'paused';
+    }
+    dlog('MS pause tore down keep-alive (keepMediaSessionOnManualPause=0)');
   }
 };
 
@@ -1380,6 +1457,7 @@ export const pause = (): void => {
 
 export const resume = (): void => {
   pausedByUser = false;
+  dlog(`MS/player resume ${keepAliveDebugState()}`);
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = 'playing';
   }

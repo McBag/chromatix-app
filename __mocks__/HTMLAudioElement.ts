@@ -22,6 +22,11 @@ export class MockHTMLAudioElement {
     return this.attributes[name] ?? null;
   }
 
+  removeAttribute(name: string) {
+    if (name === 'src') this.src = '';
+    delete this.attributes[name];
+  }
+
   addEventListener(event: string, listener: Function, options?: any) {
     if (!this.eventListeners[event]) {
       this.eventListeners[event] = [];

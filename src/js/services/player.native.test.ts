@@ -560,4 +560,130 @@ describe('Player Service', () => {
       expect(elementA().currentTime).toBe(90);
     });
   });
+
+  // ======================================================================
+  // MEDIA SESSION HOLD ON MANUAL PAUSE
+  // ======================================================================
+
+  describe('Media Session hold on manual pause', () => {
+    let setPositionState: ReturnType<typeof vi.fn>;
+    let lastCtx: {
+      state: string;
+      close: () => Promise<void>;
+    } | null;
+
+    const silentEl = () => createdElements.find((el) => el.loop) ?? createdElements.find((el) => el.volume === 0.01);
+
+    beforeEach(async () => {
+      lastCtx = null;
+      const FakeAudioContext = function FakeAudioContext() {
+        const ctx = {
+          state: 'running',
+          currentTime: 0,
+          destination: {},
+          createOscillator() {
+            return {
+              frequency: { value: 0 },
+              type: 'sine',
+              connect() {},
+              start() {},
+              stop() {},
+              disconnect() {},
+            };
+          },
+          createGain() {
+            return {
+              gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {} },
+              connect() {},
+              disconnect() {},
+            };
+          },
+          resume() {
+            ctx.state = 'running';
+            return Promise.resolve();
+          },
+          close() {
+            ctx.state = 'closed';
+            return Promise.resolve();
+          },
+          addEventListener() {},
+          removeEventListener() {},
+        };
+        lastCtx = ctx;
+        return ctx;
+      };
+      (window as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+      setPositionState = vi.fn();
+      Object.defineProperty(navigator, 'mediaSession', {
+        configurable: true,
+        value: {
+          metadata: { title: 'Hungry for Life', artist: 'April Art - Fairground' },
+          playbackState: 'none',
+          setPositionState,
+          setActionHandler: vi.fn(),
+        },
+      });
+      defaultInit();
+      player.loadTrack('http://example.com/track1.mp3', 0, true, 200000);
+      await Promise.resolve();
+    });
+
+    test('defaults keep the session and silent keep-alive on pause, and do not register stop', () => {
+      expect(player.mediaSessionPausePolicy.keepMediaSessionOnManualPause).toBe(true);
+      expect(player.mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(true);
+      expect(player.mediaSessionPausePolicy.registerMediaSessionStopAsPause).toBe(false);
+    });
+
+    test('pause keeps Media Session, AudioContext and silent loop claimed', async () => {
+      const silent = silentEl();
+      expect(silent).toBeTruthy();
+      const silentSrc = silent!.src;
+      expect(silentSrc).toBeTruthy();
+      expect(lastCtx?.state).toBe('running');
+
+      player.pause();
+
+      expect(elementA().paused).toBe(true);
+      expect(player.isManualPause()).toBe(true);
+      expect(navigator.mediaSession.playbackState).toBe('paused');
+      expect(navigator.mediaSession.metadata?.title).toBe('Hungry for Life');
+      expect(setPositionState).toHaveBeenCalled();
+      expect(lastCtx?.state).not.toBe('closed');
+      expect(silent!.src).toBe(silentSrc);
+      expect(silent!.paused).toBe(false);
+    });
+
+    test('resume after a held pause starts the active element again', async () => {
+      player.pause();
+      expect(elementA().paused).toBe(true);
+      player.resume();
+      await Promise.resolve();
+      expect(player.isManualPause()).toBe(false);
+      expect(elementA().paused).toBe(false);
+      expect(navigator.mediaSession.playbackState).toBe('playing');
+      expect(lastCtx?.state).not.toBe('closed');
+    });
+
+    test('optional in-place pause leaves src and AudioContext in place', async () => {
+      player.mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause = false;
+      const silent = silentEl();
+      const silentSrc = silent!.src;
+      player.pause();
+      expect(elementA().paused).toBe(true);
+      expect(silent!.paused).toBe(true);
+      expect(silent!.src).toBe(silentSrc);
+      expect(lastCtx?.state).not.toBe('closed');
+      expect(navigator.mediaSession.playbackState).toBe('paused');
+    });
+
+    test('legacy teardown still closes keep-alive when the hold flag is off', async () => {
+      player.mediaSessionPausePolicy.keepMediaSessionOnManualPause = false;
+      const silent = silentEl();
+      player.pause();
+      expect(elementA().paused).toBe(true);
+      expect(silent!.src).toBe('');
+      expect(lastCtx?.state).toBe('closed');
+      expect(navigator.mediaSession.playbackState).toBe('paused');
+    });
+  });
 });

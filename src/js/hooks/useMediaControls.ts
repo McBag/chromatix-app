@@ -61,6 +61,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
       navigator.mediaSession.setActionHandler('nexttrack', noop);
     } else {
       navigator.mediaSession.setActionHandler('play', () => {
+        dlog('MS play accepted -> resume');
         playerX.clearManualPauseFlag();
         playerX.ensureAudioKeepAlive();
         handlersRef.current.play();
@@ -91,6 +92,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
           playerX.handleBecameHidden();
           return;
         }
+        dlog('MS pause accepted -> playerPause (hold session)');
         handlersRef.current.pause();
       });
 
@@ -106,6 +108,20 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         handlersRef.current.next();
       });
+
+      if (playerX.mediaSessionPausePolicy.registerMediaSessionStopAsPause) {
+        dlog('MS stop handler registered (maps to pause)');
+        navigator.mediaSession.setActionHandler('stop', () => {
+          const sincePlay = playerX.msSincePlayIntent();
+          if (sincePlay < playIntentPauseGuardMs) {
+            dlog(`MS stop IGNORED (${sincePlay} ms after play)`);
+            navigator.mediaSession.playbackState = 'playing';
+            return;
+          }
+          dlog('MS stop accepted -> treated as pause (session held)');
+          handlersRef.current.pause();
+        });
+      }
     }
 
     const handleVisibility = (): void => {
@@ -125,6 +141,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
         navigator.mediaSession.setActionHandler('seekforward', null);
         navigator.mediaSession.setActionHandler('previoustrack', null);
         navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('stop', null);
       }
     };
   }, [keyboardMediaKeys]);
