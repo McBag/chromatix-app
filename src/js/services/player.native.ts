@@ -4,7 +4,6 @@
 
 import { dlog } from 'js/debug/audioDebug';
 import { endedAtDecodedDuration, resolveTrustedDurationSec } from 'js/utils/trustedDuration';
-import { notifyTeslaArtworkLoadStarted, notifyTeslaArtworkPlaybackStarted } from 'js/utils/teslaArtworkFix';
 import { clearMediaSessionPauseOrigin } from './mediaSessionPauseAction';
 import {
   describeMediaSessionPausePolicy,
@@ -206,7 +205,6 @@ const setupPlayerElement = (element: HTMLAudioElement, volumeLevel: number, volu
   });
   element.addEventListener('playing', () => {
     if (!isActivePlayer(element) || pausedByUser) return;
-    notifyTeslaArtworkPlaybackStarted();
     stopHiddenLoadRecovery();
     ensureAudioKeepAlive();
     if (!trackEndPollId) {
@@ -353,7 +351,6 @@ const tryAdoptStandby = (trackSrc: string, progress: number, play: boolean, play
     if (alreadyPlaying && !playerElement.paused) {
       startTrackEndPolling();
       scheduleGaplessTimer();
-      notifyTeslaArtworkPlaybackStarted();
     } else {
       playWhenReady(playerElement, playToken);
       startHiddenLoadRecovery(playToken);
@@ -1395,7 +1392,6 @@ export const loadTrack = (
   pendingSeekSec = progress > 0 ? progress / 1000 : null;
   lastAdvancedToSrc = trackSrc;
   const playToken = ++activePlayToken;
-  notifyTeslaArtworkLoadStarted();
 
   if (play) {
     setMediaSessionPlaying();
@@ -1423,9 +1419,6 @@ export const loadTrack = (
         startTrackEndPolling();
       }
       scheduleGaplessTimer();
-      if (!playerElement.paused) {
-        notifyTeslaArtworkPlaybackStarted();
-      }
     } else {
       stopTrackEndPolling();
     }

@@ -1,5 +1,4 @@
 import { logMediaSessionArtwork } from 'js/debug/debugLog';
-import { mediaSessionPausePolicy, subscribeMediaSessionPausePolicy } from 'js/services/mediaSessionPausePolicy';
 
 interface MediaArtwork {
   src: string;
@@ -11,20 +10,11 @@ interface TrackLike {
   title?: string;
   artist?: string;
   album?: string;
-  albumId?: string | number;
   thumbSm?: string;
   thumbMd?: string;
   /** Pre-built MediaSession artwork (e.g. from ControlBar). Preferred over thumbs. */
   artwork?: MediaArtwork[];
 }
-
-export type TeslaSetMetadataOptions = {
-  /** Bypass identical-metadata dedupe and assign a new MediaMetadata (Tesla artwork retry). */
-  forceRetry?: boolean;
-};
-
-/** Delay after the `playing` event before the one-shot Media Session artwork retry. */
-export const mediaSessionArtworkRetryMs = 1500;
 
 /**
  * Tesla media player line 1 (`title`): the plain track title.
@@ -94,106 +84,7 @@ const isSameMetadata = (
   );
 };
 
-const snapshotTrack = (track: TrackLike): TrackLike => ({
-  title: track.title,
-  artist: track.artist,
-  album: track.album,
-  albumId: track.albumId,
-  thumbSm: track.thumbSm,
-  thumbMd: track.thumbMd,
-  artwork: track.artwork ? cloneArtwork(track.artwork) : undefined,
-});
-
-const artworkRetryKey = (track: TrackLike): string => {
-  if (track.albumId != null && String(track.albumId) !== '') return String(track.albumId);
-  const album = (track.album || '').trim();
-  if (album) return `album:${album}`;
-  const src = artworkSrcs(buildArtwork(track))[0];
-  return src ? `art:${src}` : '';
-};
-
-let retryTimer: number | null = null;
-let pendingRetryTrack: TrackLike | null = null;
-let pendingRetryKey = '';
-let retriedArtworkKey = '';
-let retryAwaitingPlaying = false;
-
-const clearRetryTimer = (): void => {
-  if (retryTimer != null) {
-    window.clearTimeout(retryTimer);
-    retryTimer = null;
-  }
-};
-
-const cancelPendingArtworkRetry = (): void => {
-  clearRetryTimer();
-  pendingRetryTrack = null;
-  pendingRetryKey = '';
-  retryAwaitingPlaying = false;
-};
-
-export const resetTeslaArtworkRetryForTests = (): void => {
-  cancelPendingArtworkRetry();
-  retriedArtworkKey = '';
-};
-
-const armArtworkRetry = (track: TrackLike): void => {
-  if (!mediaSessionPausePolicy.retryArtworkAfterPlay) {
-    cancelPendingArtworkRetry();
-    return;
-  }
-  if (artworkSrcs(buildArtwork(track)).length === 0) return;
-  const key = artworkRetryKey(track);
-  if (!key) return;
-  if (key === retriedArtworkKey) return;
-  if (key === pendingRetryKey && pendingRetryTrack) {
-    pendingRetryTrack = snapshotTrack(track);
-    return;
-  }
-  clearRetryTimer();
-  pendingRetryTrack = snapshotTrack(track);
-  pendingRetryKey = key;
-  retryAwaitingPlaying = true;
-};
-
-/** A new media load started: do not fire a retry until `playing` is heard again. */
-export const notifyTeslaArtworkLoadStarted = (): void => {
-  if (!pendingRetryTrack) return;
-  clearRetryTimer();
-  retryAwaitingPlaying = true;
-};
-
-/** Actual playback started. Schedule the one-shot artwork rewrite after the retry delay. */
-export const notifyTeslaArtworkPlaybackStarted = (): void => {
-  if (!pendingRetryTrack || !mediaSessionPausePolicy.retryArtworkAfterPlay) return;
-  if (retryTimer != null) return;
-  retryAwaitingPlaying = false;
-  const key = pendingRetryKey;
-  const track = pendingRetryTrack;
-  retryTimer = window.setTimeout(() => {
-    retryTimer = null;
-    if (retryAwaitingPlaying) return;
-    if (!mediaSessionPausePolicy.retryArtworkAfterPlay) return;
-    if (!track || pendingRetryKey !== key) return;
-    pendingRetryTrack = null;
-    pendingRetryKey = '';
-    retriedArtworkKey = key;
-    teslaSetMetadataFromTrack(track, { forceRetry: true });
-  }, mediaSessionArtworkRetryMs);
-};
-
-if (typeof window !== 'undefined') {
-  subscribeMediaSessionPausePolicy(() => {
-    if (!mediaSessionPausePolicy.retryArtworkAfterPlay) {
-      cancelPendingArtworkRetry();
-    }
-  });
-}
-
-export const teslaSetMetadataFromTrack = (
-  track: TrackLike | null | undefined,
-  options?: TeslaSetMetadataOptions
-): void => {
+export const teslaSetMetadataFromTrack = (track: TrackLike | null | undefined): void => {
   if (!track || !('mediaSession' in navigator)) return;
 
   const title = formatMediaSessionTitle(track.title);
@@ -205,14 +96,6 @@ export const teslaSetMetadataFromTrack = (
   const artwork = preservedArtwork ? cloneArtwork(current?.artwork) : incomingArtwork;
   const next = { title, artist, album, artwork };
 
-  if (options?.forceRetry) {
-    if (artwork.length === 0) return;
-    navigator.mediaSession.metadata = new MediaMetadata(next);
-    logMediaSessionArtwork('retry', next);
-    navigator.mediaSession.playbackState = 'playing';
-    return;
-  }
-
   if (isSameMetadata(current, next)) {
     logMediaSessionArtwork('skip', next);
   } else {
@@ -223,5 +106,4 @@ export const teslaSetMetadataFromTrack = (
   // Explicitly claim 'playing' state early (before loadTrack src swap) so that
   // Tesla's media focus / Bluetooth does not drop during the cold-load gap on auto-next.
   navigator.mediaSession.playbackState = 'playing';
-  armArtworkRetry(track);
 };

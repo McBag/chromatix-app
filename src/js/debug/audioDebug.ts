@@ -14,7 +14,6 @@
 //   ?msSilent=0  -> pause the silent keep-alive during pause (default 1, stays playing)
 //   ?msHold=0    -> tear down keep-alive on pause (default 1)
 //   ?msStop=1    -> register stop as a session-preserving pause (default 0)
-//   ?msArtRetry=0 -> skip the 1.5 s Media Session artwork retry after play (default 1)
 //
 // When enabled it instruments every audio element, play()/pause()/load()
 // calls (with caller names from the stack), the Media Session API,
@@ -499,7 +498,6 @@ const buildOverlay = (): void => {
   const silentBtn = mkPolicyBtn('');
   const holdBtn = mkPolicyBtn('');
   const stopBtn = mkPolicyBtn('');
-  const artRetryBtn = mkPolicyBtn('');
   const paintPolicyButtons = (): void => {
     const policy = mediaSessionPausePolicy;
     silentBtn.textContent = policy.keepSilentKeepAlivePlayingOnPause ? 'Silent: play' : 'Silent: pause';
@@ -508,8 +506,6 @@ const buildOverlay = (): void => {
     holdBtn.style.background = policy.keepMediaSessionOnManualPause ? '#084' : '#a60';
     stopBtn.textContent = policy.registerMediaSessionStopAsPause ? 'Stop→Pause: on' : 'Stop→Pause: off';
     stopBtn.style.background = policy.registerMediaSessionStopAsPause ? '#a60' : '#444';
-    artRetryBtn.textContent = policy.retryArtworkAfterPlay ? 'ArtRetry: on' : 'ArtRetry: off';
-    artRetryBtn.style.background = policy.retryArtworkAfterPlay ? '#084' : '#a60';
   };
   paintPolicyButtons();
   silentBtn.onclick = () => {
@@ -533,14 +529,7 @@ const buildOverlay = (): void => {
     paintPolicyButtons();
     dlog(`MS policy ${describeMediaSessionPausePolicy()}`);
   };
-  artRetryBtn.onclick = () => {
-    setMediaSessionPausePolicy({
-      retryArtworkAfterPlay: !mediaSessionPausePolicy.retryArtworkAfterPlay,
-    });
-    paintPolicyButtons();
-    dlog(`MS policy ${describeMediaSessionPausePolicy()}`);
-  };
-  policyBar.append(silentBtn, holdBtn, stopBtn, artRetryBtn);
+  policyBar.append(silentBtn, holdBtn, stopBtn);
 
   root.append(bar, ua, policyBar, list);
 

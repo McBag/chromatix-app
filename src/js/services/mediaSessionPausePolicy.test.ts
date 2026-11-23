@@ -18,8 +18,7 @@ describe('mediaSessionPausePolicy', () => {
     applyMediaSessionPausePolicyFromSearch('');
     expect(mediaSessionPausePolicy).toEqual(defaultMediaSessionPausePolicy);
     expect(mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(true);
-    expect(mediaSessionPausePolicy.retryArtworkAfterPlay).toBe(true);
-    expect(describeMediaSessionPausePolicy()).toBe('hold=1 silentPlaying=1 stopAsPause=0 artRetry=1');
+    expect(describeMediaSessionPausePolicy()).toBe('hold=1 silentPlaying=1 stopAsPause=0');
   });
 
   test('parses debug URL flags', () => {
@@ -30,9 +29,6 @@ describe('mediaSessionPausePolicy', () => {
     });
     expect(parseMediaSessionPausePolicySearch('msSilent=0')).toEqual({
       keepSilentKeepAlivePlayingOnPause: false,
-    });
-    expect(parseMediaSessionPausePolicySearch('?msArtRetry=0')).toEqual({
-      retryArtworkAfterPlay: false,
     });
   });
 
@@ -46,7 +42,7 @@ describe('mediaSessionPausePolicy', () => {
     expect(mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause).toBe(true);
     expect(mediaSessionPausePolicy.registerMediaSessionStopAsPause).toBe(true);
     expect(seen.length).toBeGreaterThanOrEqual(1);
-    expect(seen.at(-1)).toBe('hold=1 silentPlaying=1 stopAsPause=1 artRetry=1');
+    expect(seen.at(-1)).toBe('hold=1 silentPlaying=1 stopAsPause=1');
     unsubscribe();
   });
 });

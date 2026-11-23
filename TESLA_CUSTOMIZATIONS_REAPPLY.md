@@ -209,9 +209,9 @@ controlBarAlbum: true,
 | 1    | `title`  | Track title (`formatMediaSessionTitle`)       |
 | 2    | `artist` | `Artist - Album` (`formatMediaSessionArtist`) |
 
-Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The `album` field remains set even though Tesla line 2 already includes the album name. A second call with the same title, artist, album, and artwork URLs does not assign a new `MediaMetadata` (Tesla can cancel an in-flight cover load on album change). If a later update has no artwork, the existing cover is kept. After the first `playing` event of a playback or album change, one fresh `MediaMetadata` is written ~1.5 s later (`retryArtworkAfterPlay`, default on; `?msArtRetry=0` disables it). That retry bypasses the identical-payload dedupe; a load that starts before the timer fires cancels it until `playing` is heard again. With `?debug=1`, each update is logged as `MS artwork action=set|skip|preserve|retry` (tokens redacted).
+Metadata is set on track load (`teslaSetMetadataFromTrack` in `playerLoadTrackList` / `playerLoadIndex`) and via `useMediaMeta`. Unicode is kept as-is. The `album` field remains set even though Tesla line 2 already includes the album name. A second call with the same title, artist, album, and artwork URLs does not assign a new `MediaMetadata` (Tesla can cancel an in-flight cover load on album change). If a later update has no artwork, the existing cover is kept. With `?debug=1`, each update is logged as `MS artwork action=set|skip|preserve` (tokens redacted).
 
-**Known residual:** Without the retry, Tesla system UI may still show cover only from the second track on some firmware builds. An earlier multi-reapply/preload path (during load) was tried and **reverted** (did not help; it could cancel artwork loads).
+**Known residual:** Tesla system UI may still show cover only from the second track on some firmware builds. An experimental multi-reapply/preload path was tried and **reverted** (did not help).
 
 ---
 
