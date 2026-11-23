@@ -32,6 +32,7 @@ import {
 import { ErrorPage } from 'js/pages';
 import { getEnvironment, sendToElectron } from 'js/utils';
 import BrowserRouteSwitch from 'js/app/BrowserRouteSwitch';
+import { DebugEventWatch } from 'js/debug/DebugEventWatch';
 
 // ======================================================================
 // COMPONENT
@@ -402,6 +403,8 @@ const AppMain = () => {
       }}
     >
       {envData.isElectron && <ElectronUI />}
+
+      <DebugEventWatch />
 
       {fullPageMode && <FullPagePlayer />}
 

@@ -65,7 +65,7 @@ const TitleHeading = ({
               });
             }}
           >
-            <ArtworkImage src={thumb} alt={title} />
+            <ArtworkImage src={thumb} alt={title} debugKind="cover" />
           </button>
         )}
 

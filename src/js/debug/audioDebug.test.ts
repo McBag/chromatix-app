@@ -60,4 +60,28 @@ describe('audioDebug opt-in', () => {
     expect(localStorage.getItem('chromatix_debug')).toBeNull();
     expect(document.getElementById('chromatix-debug-overlay')).toBeNull();
   });
+
+  test('Images button filters the overlay to image and album lines', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }));
+    const mod = await load('?debug=1');
+    mod.dlog('CALL play xyz');
+    mod.dlog('IMG error kind=cover url=https://example/cover.jpg');
+    mod.dlog('ALBUM change source=route from=1:"A" to=2:"B"');
+    await vi.waitFor(() => {
+      const overlay = document.getElementById('chromatix-debug-overlay');
+      expect(overlay?.textContent).toContain('IMG error');
+      expect(overlay?.textContent).toContain('CALL play');
+    });
+    const images = Array.from(document.querySelectorAll('#chromatix-debug-overlay button')).find(
+      (b) => b.textContent === 'Images' || b.textContent === 'Images ✓'
+    ) as HTMLButtonElement;
+    expect(images).toBeTruthy();
+    images.click();
+    const overlay = document.getElementById('chromatix-debug-overlay');
+    expect(images.textContent).toBe('Images ✓');
+    expect(overlay?.textContent).toContain('IMG error');
+    expect(overlay?.textContent).toContain('ALBUM change');
+    expect(overlay?.textContent).not.toContain('CALL play');
+    vi.unstubAllGlobals();
+  });
 });

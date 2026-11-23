@@ -315,18 +315,19 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 
 ## New / heavily forked source files (checklist)
 
-| Path                                   | Purpose                                    |
-| -------------------------------------- | ------------------------------------------ |
-| `src/js/utils/teslaArtworkFix.ts`      | MediaSession title/artist + artwork helper |
-| `src/js/utils/trustedDuration.ts`      | Live vs metadata duration for track-end    |
-| `src/js/hooks/usePlaybackKeepAlive.ts` | Background multi-song keep-alive           |
-| `src/js/hooks/useTeslaOptimization.ts` | MediaSession position poll                 |
-| `src/js/hooks/useMediaControls.ts`     | MediaSession actions (ignore hidden pause) |
-| `src/js/components/AlphabetNav/*`      | Letter jump bar                            |
-| `src/js/pages/RecentlyAdded.jsx`       | Sidebar page                               |
-| `src/js/pages/RandomAlbums.jsx`        | Sidebar page                               |
-| `lib/build-win.mjs`                    | Windows Vite build                         |
-| `lib/finalize-cra-layout.mjs`          | CRA deploy layout for Tesla static hosting |
+| Path                                        | Purpose                                    |
+| ------------------------------------------- | ------------------------------------------ |
+| `src/js/utils/teslaArtworkFix.ts`           | MediaSession title/artist + artwork helper |
+| `src/js/utils/trustedDuration.ts`           | Live vs metadata duration for track-end    |
+| `src/js/hooks/usePlaybackKeepAlive.ts`      | Background multi-song keep-alive           |
+| `src/js/hooks/useTeslaOptimization.ts`      | MediaSession position poll                 |
+| `src/js/hooks/useMediaControls.ts`          | MediaSession actions (ignore hidden pause) |
+| `src/js/debug/audioDebug.ts`, `debugLog.ts` | Opt-in overlay + debug-only remote log     |
+| `src/js/components/AlphabetNav/*`           | Letter jump bar                            |
+| `src/js/pages/RecentlyAdded.jsx`            | Sidebar page                               |
+| `src/js/pages/RandomAlbums.jsx`             | Sidebar page                               |
+| `lib/build-win.mjs`                         | Windows Vite build                         |
+| `lib/finalize-cra-layout.mjs`               | CRA deploy layout for Tesla static hosting |
 
 ### Patched stock files (high level)
 
@@ -399,4 +400,4 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - [ ] Deploy tree matches existing Tesla host layout in FileZilla
 - [ ] Interrupted by another source (radio/phone) → resume: keeps playing, no Play/Pause flicker (`playIntentPauseGuardMs` in `useMediaControls.ts`, `msSincePlayIntent()` in `player.ts`)
 - [ ] Tesla media card centre button: first tap pauses (card stays, silent keep-alive keeps playing), second tap after ~600 ms resumes (`MS pause while manual-paused -> resume`). In-app pause then bar-tap does not resume. Debug: `MS pause hold … silentPlaying=1`, no `AC close()`. Overlay / `?msSilent=0` only as an experiment (card may disappear after Grok or stop). **Verified in the car on 2026-11-23** (re-check after upstream merges).
-- [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`)
+- [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`). **Images** filters the list to cover/thumbnail/album lines. With debug on, events are also appended to `~/logs/chromatix-debug.log` via `POST /__chromatix-debug-log` (off otherwise).

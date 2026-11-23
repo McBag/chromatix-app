@@ -39,6 +39,8 @@ The opt-in overlay lives permanently on `main`. It is hidden unless enabled:
 
 - `?debug=1` — show the overlay (remembered in `localStorage`); the header includes the app version
 - `?debug=0` or the `×` button — hide it
+- The overlay **Images** button (next to LOG / Clear / Mark) shows only cover, thumbnail, and album-change lines
+- While the overlay is on, the same events (including image load/failure with HTTP status, album changes, and Media Session / playback lines) are batched to `POST /__chromatix-debug-log` and appended on the Tesla host at `~/logs/chromatix-debug.log`. Nothing is sent or written when debug is off
 - `?msSilent=0` — pause the silent keep-alive during a held pause (experiment; the card may disappear after a Grok call or a stop)
 - `?msHold=0` — tear down keep-alive on pause
 - `?msStop=1` — register Media Session `stop` as a session-preserving pause (may change the car's centre icon)

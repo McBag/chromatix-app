@@ -18,8 +18,17 @@
 // When enabled it instruments every audio element, play()/pause()/load()
 // calls (with caller names from the stack), the Media Session API,
 // AudioContext, page lifecycle and viewport events, and the Redux player
-// flags. Must be imported before anything that creates audio elements.
+// flags. Image/album events are also logged, and batched to
+// POST /__chromatix-debug-log (Tesla host only; off unless debug is on).
+// Must be imported before anything that creates audio elements.
 
+import {
+  enqueueRemoteLog,
+  isImageDebugMessage,
+  setDebugLogSink,
+  startDebugLogging,
+  stopDebugLogging,
+} from 'js/debug/debugLog';
 import {
   describeMediaSessionPausePolicy,
   mediaSessionPausePolicy,
@@ -105,6 +114,7 @@ export const dlog = (msg: string): void => {
   }
   dirty = true;
   persist();
+  enqueueRemoteLog(msg);
 };
 
 export const registerActiveElementGetter = (getter: () => HTMLMediaElement | null): void => {
@@ -184,6 +194,8 @@ const viewport = (): string => {
 };
 
 const install = (): void => {
+  setDebugLogSink(dlog);
+  startDebugLogging();
   const instrumented = new WeakSet<object>();
   const instrumentElement = (el: any): void => {
     if (!el || instrumented.has(el)) return;
@@ -440,13 +452,20 @@ const buildOverlay = (): void => {
   const toggle = mkBtn('LOG –');
   const clear = mkBtn('Clear');
   const mark = mkBtn('Mark');
+  const images = mkBtn('Images');
+  images.title = 'Show only cover, thumbnail and album-change events';
+  let imageFilter = false;
+  const paintImages = (): void => {
+    images.textContent = imageFilter ? 'Images ✓' : 'Images';
+    images.style.background = imageFilter ? '#7f7' : '#ff0';
+  };
   const title = origCreateElement('span');
   title.style.cssText = 'font-size:13px;opacity:0.8;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
   title.textContent = `Chromatix DEBUG ${import.meta.env.VITE_VERSION || ''}`.trim();
   const close = mkBtn('×');
   close.title = 'Debug-Overlay ausschalten';
   close.style.marginLeft = 'auto';
-  bar.append(toggle, clear, mark, title, close);
+  bar.append(toggle, clear, mark, images, title, close);
 
   const ua = origCreateElement('div');
   ua.style.cssText = 'font-size:12px;padding:0 6px 4px;opacity:0.75;word-break:break-all;flex:0 0 auto';
@@ -512,12 +531,15 @@ const buildOverlay = (): void => {
     if (msg.startsWith('STORE')) return '#6cf';
     if (msg.startsWith('PAGE') || msg.startsWith('BAR')) return '#d9f';
     if (msg.startsWith('AC')) return '#9ff';
+    if (msg.startsWith('IMG')) return '#f9c';
+    if (msg.startsWith('ALBUM')) return '#c9f';
     return '#ddd';
   };
 
   const render = () => {
     if (collapsed) return;
-    const shown = entries.slice(-SHOWN_ENTRIES).reverse();
+    const source = imageFilter ? entries.filter((e) => isImageDebugMessage(e.msg)) : entries;
+    const shown = source.slice(-SHOWN_ENTRIES).reverse();
     list.textContent = '';
     shown.forEach((e) => {
       const row = origCreateElement('div');
@@ -536,6 +558,7 @@ const buildOverlay = (): void => {
     title.style.display = collapsed ? 'none' : 'inline';
     clear.style.display = collapsed ? 'none' : 'inline-block';
     mark.style.display = collapsed ? 'none' : 'inline-block';
+    images.style.display = collapsed ? 'none' : 'inline-block';
     root.style.width = collapsed ? 'auto' : 'min(62vw,900px)';
     toggle.textContent = collapsed ? 'LOG +' : 'LOG –';
     if (!collapsed) render();
@@ -547,8 +570,14 @@ const buildOverlay = (): void => {
     render();
   };
   mark.onclick = () => dlog('===== MARK =====');
+  images.onclick = () => {
+    imageFilter = !imageFilter;
+    paintImages();
+    render();
+  };
   close.onclick = () => {
     active = false;
+    stopDebugLogging();
     try {
       localStorage.removeItem(FLAG_KEY);
       sessionStorage.removeItem(STORAGE_KEY);

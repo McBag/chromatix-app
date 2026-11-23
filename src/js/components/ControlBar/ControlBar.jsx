@@ -66,7 +66,7 @@ const NowPlaying = () => {
               <>
                 {trackCurrent.thumbSm && (
                   <div className={style.coverArtwork}>
-                    <ArtworkImage src={trackCurrent.thumbSm} alt={trackCurrent.title} />
+                    <ArtworkImage src={trackCurrent.thumbSm} alt={trackCurrent.title} debugKind="thumb" />
                   </div>
                 )}
                 {playingLink && (

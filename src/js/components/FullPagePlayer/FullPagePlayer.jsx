@@ -82,7 +82,7 @@ const NowPlaying = () => {
           <>
             {thumbSrc && (
               <div className={style.coverArtwork}>
-                <ArtworkImage src={thumbSrc} alt={trackCurrent.title} />
+                <ArtworkImage src={thumbSrc} alt={trackCurrent.title} debugKind="cover" />
               </div>
             )}
 
