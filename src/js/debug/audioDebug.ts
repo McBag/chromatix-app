@@ -10,10 +10,21 @@
 //   ?debug=0  -> disable
 //   × button  -> disable and hide (hooks become pass-through until reload)
 //
+// Media Session pause variants (also toggle buttons on the overlay):
+//   ?msSilent=1  -> keep silent keep-alive playing during pause (default 0)
+//   ?msHold=0    -> tear down keep-alive on pause (default 1)
+//   ?msStop=1    -> register stop as a session-preserving pause (default 0)
+//
 // When enabled it instruments every audio element, play()/pause()/load()
 // calls (with caller names from the stack), the Media Session API,
 // AudioContext, page lifecycle and viewport events, and the Redux player
 // flags. Must be imported before anything that creates audio elements.
+
+import {
+  describeMediaSessionPausePolicy,
+  mediaSessionPausePolicy,
+  setMediaSessionPausePolicy,
+} from 'js/services/mediaSessionPausePolicy';
 
 const FLAG_KEY = 'chromatix_debug';
 
@@ -444,7 +455,53 @@ const buildOverlay = (): void => {
   const list = origCreateElement('div');
   list.style.cssText = 'overflow-y:auto;padding:0 6px 6px;flex:1 1 auto;white-space:pre-wrap;word-break:break-word';
 
-  root.append(bar, ua, list);
+  const policyBar = origCreateElement('div');
+  policyBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 6px 6px;flex:0 0 auto';
+  const mkPolicyBtn = (label: string): HTMLButtonElement => {
+    const b = origCreateElement('button') as HTMLButtonElement;
+    b.type = 'button';
+    b.textContent = label;
+    b.style.cssText =
+      'font:bold 15px sans-serif;padding:8px 10px;background:#444;color:#fff;border:0;border-radius:6px;cursor:pointer';
+    return b;
+  };
+  const silentBtn = mkPolicyBtn('');
+  const holdBtn = mkPolicyBtn('');
+  const stopBtn = mkPolicyBtn('');
+  const paintPolicyButtons = (): void => {
+    const policy = mediaSessionPausePolicy;
+    silentBtn.textContent = policy.keepSilentKeepAlivePlayingOnPause ? 'Silent: play' : 'Silent: pause';
+    silentBtn.style.background = policy.keepSilentKeepAlivePlayingOnPause ? '#a60' : '#084';
+    holdBtn.textContent = policy.keepMediaSessionOnManualPause ? 'Hold: on' : 'Hold: off';
+    holdBtn.style.background = policy.keepMediaSessionOnManualPause ? '#084' : '#a60';
+    stopBtn.textContent = policy.registerMediaSessionStopAsPause ? 'Stop→Pause: on' : 'Stop→Pause: off';
+    stopBtn.style.background = policy.registerMediaSessionStopAsPause ? '#a60' : '#444';
+  };
+  paintPolicyButtons();
+  silentBtn.onclick = () => {
+    setMediaSessionPausePolicy({
+      keepSilentKeepAlivePlayingOnPause: !mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause,
+    });
+    paintPolicyButtons();
+    dlog(`MS policy ${describeMediaSessionPausePolicy()}`);
+  };
+  holdBtn.onclick = () => {
+    setMediaSessionPausePolicy({
+      keepMediaSessionOnManualPause: !mediaSessionPausePolicy.keepMediaSessionOnManualPause,
+    });
+    paintPolicyButtons();
+    dlog(`MS policy ${describeMediaSessionPausePolicy()}`);
+  };
+  stopBtn.onclick = () => {
+    setMediaSessionPausePolicy({
+      registerMediaSessionStopAsPause: !mediaSessionPausePolicy.registerMediaSessionStopAsPause,
+    });
+    paintPolicyButtons();
+    dlog(`MS policy ${describeMediaSessionPausePolicy()}`);
+  };
+  policyBar.append(silentBtn, holdBtn, stopBtn);
+
+  root.append(bar, ua, policyBar, list);
 
   const colorFor = (msg: string): string => {
     if (msg.startsWith('CALL play')) return '#7f7';
@@ -475,6 +532,7 @@ const buildOverlay = (): void => {
     collapsed = !collapsed;
     list.style.display = collapsed ? 'none' : 'block';
     ua.style.display = collapsed ? 'none' : 'block';
+    policyBar.style.display = collapsed ? 'none' : 'flex';
     title.style.display = collapsed ? 'none' : 'inline';
     clear.style.display = collapsed ? 'none' : 'inline-block';
     mark.style.display = collapsed ? 'none' : 'inline-block';

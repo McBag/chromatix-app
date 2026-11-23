@@ -4,6 +4,17 @@
 
 import { dlog } from 'js/debug/audioDebug';
 import { endedAtDecodedDuration, resolveTrustedDurationSec } from 'js/utils/trustedDuration';
+import {
+  describeMediaSessionPausePolicy,
+  mediaSessionPausePolicy,
+  subscribeMediaSessionPausePolicy,
+} from './mediaSessionPausePolicy';
+
+export {
+  describeMediaSessionPausePolicy,
+  mediaSessionPausePolicy,
+  setMediaSessionPausePolicy,
+} from './mediaSessionPausePolicy';
 
 const trackEndPollMs = 250;
 const trackEndNearEndPollMs = 50;
@@ -41,26 +52,6 @@ const hiddenLoopGuardRemainingMs = 4000;
 const nearEndPollRemainingMs = 5000;
 const minPlayedBeforeEndMs = 1500;
 const positionDriftSec = 0.4;
-
-/**
- * Toggle how a manual / Media Session pause holds the Tesla media card.
- * Mutate properties to experiment (reload Media Session handlers after
- * changing `registerMediaSessionStopAsPause`).
- *
- * - `keepMediaSessionOnManualPause`: keep MediaMetadata, playbackState='paused',
- *   and position; do not tear down the keep-alive graph.
- * - `keepSilentKeepAlivePlayingOnPause`: keep the silent loop and Web Audio
- *   graph running (safer for Tesla focus). Set false to pause the silent
- *   element in place (no src reset) and leave the AudioContext open.
- * - `registerMediaSessionStopAsPause`: map Media Session `stop` to the same
- *   hold-session pause. Off by default — registering it may change the Tesla
- *   centre icon.
- */
-export const mediaSessionPausePolicy = {
-  keepMediaSessionOnManualPause: true,
-  keepSilentKeepAlivePlayingOnPause: true,
-  registerMediaSessionStopAsPause: false,
-};
 
 const shouldHoldKeepAliveWhilePaused = (): boolean =>
   mediaSessionPausePolicy.keepMediaSessionOnManualPause && mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause;
@@ -1336,6 +1327,14 @@ const playWhenReady = (element: HTMLAudioElement, playToken: number): void => {
 };
 
 export const setManualPause = (paused: boolean): void => {
+  if (paused && pausedByUser) {
+    if (mediaSessionPausePolicy.keepMediaSessionOnManualPause) {
+      syncHiddenMediaSession();
+    }
+    dlog(`MS pause already held ${describeMediaSessionPausePolicy()} ${keepAliveDebugState()}`);
+    return;
+  }
+
   pausedByUser = paused;
   if (!paused) return;
   warmStartActive = false;
@@ -1347,17 +1346,30 @@ export const setManualPause = (paused: boolean): void => {
   if (mediaSessionPausePolicy.keepMediaSessionOnManualPause) {
     holdAudioKeepAliveForPause();
     syncHiddenMediaSession();
-    dlog(
-      `MS pause hold session=1 silentPlaying=${mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause ? 1 : 0} ${keepAliveDebugState()}`
-    );
+    dlog(`MS pause hold ${describeMediaSessionPausePolicy()} ${keepAliveDebugState()}`);
   } else {
     stopAudioKeepAlive();
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'paused';
     }
-    dlog('MS pause tore down keep-alive (keepMediaSessionOnManualPause=0)');
+    dlog(`MS pause tore down keep-alive ${describeMediaSessionPausePolicy()}`);
   }
 };
+
+subscribeMediaSessionPausePolicy(() => {
+  if (!pausedByUser) return;
+  if (mediaSessionPausePolicy.keepMediaSessionOnManualPause) {
+    holdAudioKeepAliveForPause();
+    syncHiddenMediaSession();
+    dlog(`MS policy applied while paused ${describeMediaSessionPausePolicy()} ${keepAliveDebugState()}`);
+    return;
+  }
+  stopAudioKeepAlive();
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = 'paused';
+  }
+  dlog(`MS policy tore down keep-alive while paused ${describeMediaSessionPausePolicy()}`);
+});
 
 export const loadTrack = (
   trackSrc: string,
@@ -1457,7 +1469,9 @@ export const pause = (): void => {
 
 export const resume = (): void => {
   pausedByUser = false;
-  dlog(`MS/player resume ${keepAliveDebugState()}`);
+  dlog(
+    `MS/player resume ${describeMediaSessionPausePolicy()} ${keepAliveDebugState()} active=${playerElement?.paused ? 'paused' : 'playing'}`
+  );
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = 'playing';
   }

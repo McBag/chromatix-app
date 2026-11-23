@@ -1,8 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { dlog } from 'js/debug/audioDebug';
 import * as playerX from 'js/services/player';
+import {
+  describeMediaSessionPausePolicy,
+  mediaSessionPausePolicy,
+  subscribeMediaSessionPausePolicy,
+} from 'js/services/mediaSessionPausePolicy';
 
 interface MediaControlHandlers {
   play: () => void;
@@ -35,6 +40,9 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
   handlersRef.current = handlers;
   const hiddenAtRef = useRef(0);
   const lastSystemPauseAtRef = useRef(0);
+  const [policyTick, setPolicyTick] = useState(0);
+
+  useEffect(() => subscribeMediaSessionPausePolicy(() => setPolicyTick((tick) => tick + 1)), []);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) {
@@ -53,6 +61,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
     };
 
     if (!keyboardMediaKeys) {
+      dlog('MS handlers noop (keyboardMediaKeys=0)');
       navigator.mediaSession.setActionHandler('play', noop);
       navigator.mediaSession.setActionHandler('pause', noop);
       navigator.mediaSession.setActionHandler('seekbackward', noop);
@@ -61,7 +70,9 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
       navigator.mediaSession.setActionHandler('nexttrack', noop);
     } else {
       navigator.mediaSession.setActionHandler('play', () => {
-        dlog('MS play accepted -> resume');
+        dlog(
+          `MS play accepted -> resume manualPause=${playerX.isManualPause() ? 1 : 0} ${describeMediaSessionPausePolicy()}`
+        );
         playerX.clearManualPauseFlag();
         playerX.ensureAudioKeepAlive();
         handlersRef.current.play();
@@ -109,7 +120,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
         handlersRef.current.next();
       });
 
-      if (playerX.mediaSessionPausePolicy.registerMediaSessionStopAsPause) {
+      if (mediaSessionPausePolicy.registerMediaSessionStopAsPause) {
         dlog('MS stop handler registered (maps to pause)');
         navigator.mediaSession.setActionHandler('stop', () => {
           const sincePlay = playerX.msSincePlayIntent();
@@ -121,7 +132,13 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
           dlog('MS stop accepted -> treated as pause (session held)');
           handlersRef.current.pause();
         });
+      } else {
+        navigator.mediaSession.setActionHandler('stop', null);
       }
+
+      dlog(
+        `MS handlers ready keys=1 play=1 pause=1 stop=${mediaSessionPausePolicy.registerMediaSessionStopAsPause ? 1 : 0} ${describeMediaSessionPausePolicy()}`
+      );
     }
 
     const handleVisibility = (): void => {
@@ -144,7 +161,7 @@ const useMediaControls = (handlers: MediaControlHandlers): null => {
         navigator.mediaSession.setActionHandler('stop', null);
       }
     };
-  }, [keyboardMediaKeys]);
+  }, [keyboardMediaKeys, policyTick]);
 
   return null;
 };

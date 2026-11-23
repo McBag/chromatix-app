@@ -112,7 +112,7 @@ npx serve -s build -l 4173
 
 ### Behavior notes
 
-- **Manual pause:** `sessionModel._manualPause` set on `playerPause`; cleared on play/resume/new track list. KeepAlive does not auto-resume the **track** after user pause. With `mediaSessionPausePolicy.keepMediaSessionOnManualPause` (default on), pause does **not** call `stopAudioKeepAlive`: MediaMetadata stays, `playbackState` is `paused`, `setPositionState` is kept, and the silent keep-alive / AudioContext stay claimed (`mediaSessionPausePolicy.keepSilentKeepAlivePlayingOnPause`, default on). Set the silent flag to false to only pause the silent element in place (no `src` reset, AudioContext stays open). The Tesla centre button sends `pause` (not `stop`); `mediaSessionPausePolicy.registerMediaSessionStopAsPause` (default off) maps `stop` to the same hold-session pause — registering it may change the car icon. `playerPause` writes the **live** element position into `playingTrackProgress` (not the 30 s-throttled store value).
+- **Manual pause:** `sessionModel._manualPause` set on `playerPause`; cleared on play/resume/new track list. KeepAlive does not auto-resume the **track** after user pause. With `mediaSessionPausePolicy.keepMediaSessionOnManualPause` (default on), pause does **not** call `stopAudioKeepAlive`: MediaMetadata stays, `playbackState` is `paused`, and `setPositionState` is kept. The silent keep-alive element is **paused in place** (no `src` reset, AudioContext stays open) because a still-playing silent loop makes Chromium / Tesla keep the stop square and refuse to show Play (`keepSilentKeepAlivePlayingOnPause` default **off**). Set that flag to true only as an experiment. The Tesla centre button sends `pause` (not `stop`); `registerMediaSessionStopAsPause` (default off) maps `stop` to the same hold-session pause — registering it may change the car icon. The three flags are `mediaSessionPausePolicy` (module `mediaSessionPausePolicy.ts`); with `?debug=1` the overlay has toggle buttons, and `?msSilent=1`, `?msHold=0`, `?msStop=1` set them from the URL. `setManualPause` is idempotent (the router plus native pause no longer double-applies the hold). `playerPause` writes the **live** element position into `playingTrackProgress` (not the 30 s-throttled store value).
 - **Pause time is not played time:** `usePlaybackKeepAlive` re-seeds `trackStartRef` on resume from `getPlaybackProgressMs()`. Wall-clock auto-next used to include the pause duration, so a long pause then play near the end skipped to the next song.
 - **Saved position / seek:** native + DASH keep `lastGoodPositionSec` + `pendingSeekSec`. `resume` / `canplay` / `window.online` call `recoverToSavedPosition`. If `currentTime` jumps to 0 or a collapsed duration end, the saved point is restored (reload same `src` if the element `ended` or has an error).
 - **False `ended`:** ignore `ended` when a mid-track position is far from the trusted duration (buffer death / Tesla stream drop). Immediate `ended` at ~0 still advances so broken files do not stall the queue.
@@ -328,7 +328,7 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 
 ### Patched stock files (high level)
 
-- `src/js/services/player.native.ts`, `player.dash.ts`, `player.ts`
+- `src/js/services/player.native.ts`, `player.dash.ts`, `player.ts`, `mediaSessionPausePolicy.ts`
 - `src/js/store/models.player.js`, `models.session.js`
 - `src/js/app/App.jsx`
 - `src/js/hooks/index.js`, `useMediaMeta.ts`, `usePlayerProgress.ts`, `usePlaybackKeepAlive.ts`
@@ -396,5 +396,5 @@ On merge conflicts in `bridge.js`: **take upstream**, keep Tesla player/store co
 - [ ] MediaSession title uses real umlauts (no ae/oe rewrite)
 - [ ] Deploy tree matches existing Tesla host layout in FileZilla
 - [ ] Interrupted by another source (radio/phone) → resume: keeps playing, no Play/Pause flicker (`playIntentPauseGuardMs` in `useMediaControls.ts`, `msSincePlayIntent()` in `player.ts`)
-- [ ] Tesla media card centre button: pauses, card can show Play, Play resumes (`mediaSessionPausePolicy.keepMediaSessionOnManualPause`). Debug: `MS pause hold`, no `AC close()` / silent `emptied`. `registerMediaSessionStopAsPause` stays off unless testing the icon.
+- [ ] Tesla media card centre button: pauses, card shows Play, Play resumes. Default: hold session, **pause** the silent loop (`keepSilentKeepAlivePlayingOnPause=0`). Debug: `MS pause hold hold=1 silentPlaying=0`, no `AC close()` / silent `emptied`, then `MS ACTION play` / `MS play accepted -> resume`. Overlay toggles or `?msSilent=1` / `?msStop=1` try the other variants.
 - [ ] Debug overlay hidden by default; `?debug=1` shows `Chromatix DEBUG <version>`, `?debug=0` / `×` hides it (`src/js/debug/audioDebug.ts`)

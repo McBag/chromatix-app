@@ -263,7 +263,7 @@ export const setManualPause = (paused: boolean): void => {
 
 export const isManualPause = (): boolean => nativeX.isManualPause();
 
-export { mediaSessionPausePolicy } from './player.native';
+export { describeMediaSessionPausePolicy, mediaSessionPausePolicy, setMediaSessionPausePolicy } from './player.native';
 
 export const isPlaybackExpected = (): boolean => {
   if (activePlayer === 'dash') return !nativeX.isManualPause();
