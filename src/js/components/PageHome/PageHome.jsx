@@ -159,7 +159,7 @@ export const PageHome = () => {
               </li>
               <li>
                 <code>npm run build:win</code> produces a CRA-style <code>build/</code> tree for Tesla static hosting.
-                On the Ultra.cc nginx host, <code>index.html</code> is served with Cache-Control no-cache, and{' '}
+                On the self-hosted nginx server, <code>index.html</code> is served with Cache-Control no-cache, and{' '}
                 <code>/static</code> assets with a long immutable cache. Snapshot branches{' '}
                 <code>{'release/<version>'}</code> keep the last three versions (currently 1.0.0, 0.74.0, and 0.73.0),
                 based on the matching upstream tags.

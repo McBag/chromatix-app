@@ -49,8 +49,8 @@ The opt-in overlay lives permanently on `main`. It is hidden unless enabled:
 ### Hosting and branches
 
 - `npm run build:win` produces a CRA-style `build/` tree (`index.html`, `static/{js,css,media}`, `icon/`, `images/`, `asset-manifest.json`) for Tesla static hosting. Do not deploy Vite's raw `assets/` output. `"homepage": "."` keeps asset URLs relative.
-- On the Ultra.cc nginx host, `index.html` is served with `Cache-Control: no-cache` (the car caches HTML aggressively otherwise) and `/static` assets with a long immutable cache.
-- `@vercel/analytics` is mounted only on `*.vercel.app`. On the Ultra.cc host it is omitted so the car does not load `/_vercel/insights/script.js` (that path falls back to `index.html` and throws `Unexpected token '<'`).
+- On the self-hosted nginx server, `index.html` is served with `Cache-Control: no-cache` (the car caches HTML aggressively otherwise) and `/static` assets with a long immutable cache.
+- `@vercel/analytics` is mounted only on `*.vercel.app`. On the self-hosted server it is omitted so the car does not load `/_vercel/insights/script.js` (that path falls back to `index.html` and throws `Unexpected token '<'`).
 - Upstream updates are merged from tags (see [`UPSTREAM_SYNC.md`](UPSTREAM_SYNC.md)). Snapshot branches `release/<version>` keep the last three versions: `release/1.0.0` (upstream Chromatix 1.0.0, plus Tesla work through the Artist - Album media-card line), `release/0.74.0`, and `release/0.73.0`. Later Media Session pause/resume work is on `main`.
 
 ### Known limits

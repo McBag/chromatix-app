@@ -11,7 +11,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     exit;
 }
 
-$home = getenv('HOME') ?: '/home/autodownloader';
+$home = getenv('CHROMATIX_HOME') ?: getenv('HOME');
+if (!$home) {
+    http_response_code(500);
+    exit;
+}
 $log = $home . '/logs/chromatix-debug.log';
 $maxBytes = 5 * 1024 * 1024;
 $keepBytes = 1 * 1024 * 1024;
