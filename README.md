@@ -32,7 +32,7 @@ This fork is maintained for the Tesla in-car browser (split pane, background tab
 
 - **Recently Added** and **Random Albums** sidebar pages (not in upstream). Their list headers are sticky in the same way as the Albums tab (the title block is passed as `ViewList` / `ViewGrid` children).
 - The album page reuses cached album info and artwork from `allArtistAlbums` and similar lists (IDs compared with `String()`), so the header can appear immediately with a known thumb. The large header uses the 680px `thumbMd` image, with the 360px thumb as a fallback until that loads.
-- Media Session **title is the track title only**; the second line is **Artist - Album** when an album is present (`teslaArtworkFix.ts`). Unicode, including umlauts, is left as-is. Artwork is taken from the track's medium or small thumb. Identical Media Session metadata is not written again (the player and the ControlBar hook both call `teslaSetMetadataFromTrack`; a second write can cancel Tesla's in-flight cover load). A follow-up update without artwork keeps the cover already on the card. A known residual: on some Tesla firmware the cover may still appear only from the second track.
+- Media Session **title is the track title only**; the second line is **Artist - Album** when an album is present (`teslaArtworkFix.ts`). Unicode, including umlauts, is left as-is. Artwork is taken from the track's medium or small thumb. Identical Media Session metadata is not written again (the player and the ControlBar hook both call `teslaSetMetadataFromTrack`; a second write can cancel Tesla's in-flight cover load). A follow-up update without artwork keeps the cover already on the card. After playback starts (or after an album change), artwork is written once more ~1.5 s after the `playing` event so Tesla can attach the cover on the first track; disable with `?msArtRetry=0`. Identical in-flight updates are still deduped. A known residual: without that retry, some Tesla firmware shows the cover only from the second track.
 
 ### Debug overlay
 
@@ -45,6 +45,7 @@ The opt-in overlay lives permanently on `main`. It is hidden unless enabled:
 - `?msSilent=0` — pause the silent keep-alive during a held pause (experiment; the card may disappear after a Grok call or a stop)
 - `?msHold=0` — tear down keep-alive on pause
 - `?msStop=1` — register Media Session `stop` as a session-preserving pause (may change the car's centre icon)
+- `?msArtRetry=0` — skip the 1.5 s first-track Media Session artwork retry (default on)
 
 ### Hosting and branches
 

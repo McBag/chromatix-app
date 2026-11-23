@@ -143,7 +143,7 @@ export const probeFailedImageUrl = async (url: string): Promise<string> => {
 };
 
 export const logMediaSessionArtwork = (
-  action: 'set' | 'skip' | 'preserve',
+  action: 'set' | 'skip' | 'preserve' | 'retry',
   input: { title?: string; artwork?: { src?: string; sizes?: string; type?: string }[] }
 ): void => {
   if (!started) return;

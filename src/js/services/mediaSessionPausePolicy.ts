@@ -13,12 +13,19 @@ export type MediaSessionPausePolicy = {
    * Off by default — registering it may change the Tesla centre icon.
    */
   registerMediaSessionStopAsPause: boolean;
+  /**
+   * Once, 1.5 s after the first `playing` event of a playback or album change,
+   * write a fresh MediaMetadata so Tesla can pick up the cover (default on).
+   * Disable with ?msArtRetry=0.
+   */
+  retryArtworkAfterPlay: boolean;
 };
 
 export const defaultMediaSessionPausePolicy: MediaSessionPausePolicy = {
   keepMediaSessionOnManualPause: true,
   keepSilentKeepAlivePlayingOnPause: true,
   registerMediaSessionStopAsPause: false,
+  retryArtworkAfterPlay: true,
 };
 
 export const mediaSessionPausePolicy: MediaSessionPausePolicy = {
@@ -32,6 +39,7 @@ const searchKeyMap = {
   msHold: 'keepMediaSessionOnManualPause',
   msSilent: 'keepSilentKeepAlivePlayingOnPause',
   msStop: 'registerMediaSessionStopAsPause',
+  msArtRetry: 'retryArtworkAfterPlay',
 } as const;
 
 type PolicyKey = keyof MediaSessionPausePolicy;
@@ -104,7 +112,7 @@ const persistPolicy = (): void => {
 };
 
 export const describeMediaSessionPausePolicy = (policy: MediaSessionPausePolicy = mediaSessionPausePolicy): string =>
-  `hold=${policy.keepMediaSessionOnManualPause ? 1 : 0} silentPlaying=${policy.keepSilentKeepAlivePlayingOnPause ? 1 : 0} stopAsPause=${policy.registerMediaSessionStopAsPause ? 1 : 0}`;
+  `hold=${policy.keepMediaSessionOnManualPause ? 1 : 0} silentPlaying=${policy.keepSilentKeepAlivePlayingOnPause ? 1 : 0} stopAsPause=${policy.registerMediaSessionStopAsPause ? 1 : 0} artRetry=${policy.retryArtworkAfterPlay ? 1 : 0}`;
 
 export const setMediaSessionPausePolicy = (patch: Partial<MediaSessionPausePolicy>): void => {
   Object.assign(mediaSessionPausePolicy, patch);
